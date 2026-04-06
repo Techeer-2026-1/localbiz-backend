@@ -37,7 +37,7 @@ def get_os_client() -> OpenSearch:
     return OpenSearch(
         hosts=[{"host": settings.opensearch_host, "port": settings.opensearch_port}],
         http_auth=(settings.opensearch_user, settings.opensearch_password),
-        use_ssl=settings.opensearch_host != "localhost",
+        use_ssl=False,
         verify_certs=False,
     )
 
