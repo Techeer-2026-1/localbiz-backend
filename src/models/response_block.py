@@ -3,9 +3,20 @@ from typing import Literal, Union, Any, List, Optional, Dict
 from pydantic import BaseModel
 
 
+class IntentBlock(BaseModel):
+    type: Literal["intent"] = "intent"
+    value: str
+
+
 class TextBlock(BaseModel):
     type: Literal["text"] = "text"
     content: str
+
+
+class TextStreamBlock(BaseModel):
+    type: Literal["text_stream"] = "text_stream"
+    system: str = ""
+    prompt: str = ""
 
 
 class Place(BaseModel):
@@ -25,6 +36,11 @@ class Place(BaseModel):
     naver_map_url: Optional[str] = None
     kakao_map_url: Optional[str] = None
     recommendation_reason: Optional[str] = None   # 추천 근거 문구
+
+
+class PlaceBlock(BaseModel):
+    type: Literal["place"] = "place"
+    data: Place
 
 
 class PlacesBlock(BaseModel):
@@ -58,6 +74,25 @@ class MapMarker(BaseModel):
     lat: float
     lng: float
     category: str
+
+
+class CourseStop(BaseModel):
+    order: int
+    place_id: str
+    name: str
+    category: str
+    lat: float
+    lng: float
+    time: Optional[str] = None
+    duration_min: Optional[int] = None
+    walk_to_next_min: Optional[int] = None
+
+
+class CourseBlock(BaseModel):
+    type: Literal["course"] = "course"
+    date: Optional[str] = None
+    area: Optional[str] = None
+    stops: List[CourseStop]
 
 
 class MapMarkersBlock(BaseModel):
@@ -104,6 +139,26 @@ class CalendarBlock(BaseModel):
     data: CalendarResult
 
 
+class Reference(BaseModel):
+    title: str
+    link: str
+    postdate: Optional[str] = None
+    source: Optional[str] = None
+
+
+class ReferencesBlock(BaseModel):
+    type: Literal["references"] = "references"
+    data: List[Reference]
+
+
+class AnalysisSourcesBlock(BaseModel):
+    type: Literal["analysis_sources"] = "analysis_sources"
+    place_name: str
+    review_count: Optional[int] = None
+    sources: Optional[Dict[str, int]] = None
+    sample_reviews: Optional[List[str]] = None
+
+
 class FavoritesBlock(BaseModel):
     type: Literal["favorites"] = "favorites"
     data: List[Place]
@@ -114,14 +169,26 @@ class DoneBlock(BaseModel):
     type: Literal["done"] = "done"
 
 
+class ErrorBlock(BaseModel):
+    type: Literal["error"] = "error"
+    message: str
+
+
 ResponseBlock = Union[
+    IntentBlock,
     TextBlock,
+    TextStreamBlock,
+    PlaceBlock,
     PlacesBlock,
     EventsBlock,
+    CourseBlock,
     MapMarkersBlock,
     MapRouteBlock,
     ChartBlock,
     CalendarBlock,
+    ReferencesBlock,
+    AnalysisSourcesBlock,
     FavoritesBlock,
     DoneBlock,
+    ErrorBlock,
 ]

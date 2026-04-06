@@ -9,16 +9,21 @@ import argparse
 import uuid
 import json
 import asyncpg
+import httpx
 import pandas as pd
 from opensearchpy import AsyncOpenSearch, helpers
-from openai import AsyncOpenAI
+from dotenv import load_dotenv
+load_dotenv("backend/.env")
+load_dotenv(".env")
+
+import os
 
 # ============================================================
 # 설정
 # ============================================================
-DATABASE_URL = "postgresql://localbiz:localbiz@localhost:5432/localbiz"
-OPENSEARCH_HOST = "localhost"
-OPENAI_API_KEY = ""  # .env에서 읽거나 인자로 전달
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://localbiz:localbiz@localhost:5434/localbiz")
+OPENSEARCH_HOST = os.getenv("OPENSEARCH_HOST", "localhost")
+GEMINI_API_KEY = os.getenv("GEMINI_LLM_API_KEY", "")
 
 CATEGORY_MAP = {
     "한식": "restaurant", "중식": "restaurant", "일식": "restaurant",
@@ -57,16 +62,36 @@ def make_page_content(row: dict) -> str:
     )
 
 
-async def embed_batch(texts: list[str], client: AsyncOpenAI) -> list[list[float]]:
+GEMINI_EMBED_URL = (
+    "https://generativelanguage.googleapis.com/v1beta/models/"
+    "gemini-embedding-001:embedContent"
+)
+
+
+async def embed_batch(texts: list[str]) -> list[list[float]]:
+    """Gemini gemini-embedding-001 (768d) 배치 임베딩. 무료."""
     results = []
-    for i in range(0, len(texts), 1000):
-        batch = texts[i:i + 1000]
-        resp = await client.embeddings.create(
-            model="text-embedding-3-small",
-            input=batch,
-        )
-        results.extend([item.embedding for item in resp.data])
-        print(f"  임베딩 {min(i + 1000, len(texts))}/{len(texts)}")
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        for i, text in enumerate(texts):
+            if not text or not text.strip():
+                results.append([0.0] * 768)
+                continue
+            payload = {
+                "model": "models/gemini-embedding-001",
+                "content": {"parts": [{"text": text.replace("\n", " ")[:2000]}]},
+                "outputDimensionality": 768,
+            }
+            resp = await client.post(
+                f"{GEMINI_EMBED_URL}?key={GEMINI_API_KEY}",
+                json=payload,
+                headers={"Content-Type": "application/json"},
+            )
+            if resp.status_code == 200:
+                results.append(resp.json()["embedding"]["values"])
+            else:
+                results.append([0.0] * 768)
+            if (i + 1) % 100 == 0:
+                print(f"  임베딩 {i + 1}/{len(texts)}")
     return results
 
 
@@ -160,13 +185,12 @@ async def run_etl(csv_path: str, default_category: str, source: str):
     print(f"  PostgreSQL 완료: {pg_count}건")
 
     # ── 4. Load — OpenSearch Bulk Index + 임베딩 ──
-    if not OPENAI_API_KEY:
-        print("  [SKIP] OPENAI_API_KEY 미설정 → OpenSearch 인덱싱 건너뜀")
+    if not GEMINI_API_KEY:
+        print("  [SKIP] GEMINI_LLM_API_KEY 미설정 → OpenSearch 인덱싱 건너뜀")
         return
 
-    oai = AsyncOpenAI(api_key=OPENAI_API_KEY)
     texts = [r["page_content"] for r in records]
-    embeddings = await embed_batch(texts, oai)
+    embeddings = await embed_batch(texts)
 
     os_client = AsyncOpenSearch(
         hosts=[{"host": OPENSEARCH_HOST, "port": OPENSEARCH_PORT}],
@@ -202,10 +226,5 @@ if __name__ == "__main__":
     parser.add_argument("--file", required=True)
     parser.add_argument("--category", default="restaurant")
     parser.add_argument("--source", default="csv")
-    parser.add_argument("--openai-key", default="")
     args = parser.parse_args()
-
-    if args.openai_key:
-        OPENAI_API_KEY = args.openai_key
-
     asyncio.run(run_etl(args.file, args.category, args.source))

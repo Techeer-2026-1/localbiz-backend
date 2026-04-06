@@ -120,3 +120,55 @@ CREATE TABLE IF NOT EXISTS place_analysis (
 
 CREATE INDEX IF NOT EXISTS idx_analysis_place ON place_analysis(place_id);
 CREATE INDEX IF NOT EXISTS idx_analysis_expires ON place_analysis(ttl_expires_at);
+
+-- ============================================================
+-- users
+-- ============================================================
+CREATE TABLE IF NOT EXISTS users (
+    user_id     UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+    email       VARCHAR(200) UNIQUE,
+    nickname    VARCHAR(100),
+    created_at  TIMESTAMPTZ  DEFAULT NOW()
+);
+
+-- ============================================================
+-- user_favorites
+-- ============================================================
+CREATE TABLE IF NOT EXISTS user_favorites (
+    favorite_id UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id     UUID         NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    place_id    UUID         NOT NULL REFERENCES places(place_id) ON DELETE CASCADE,
+    created_at  TIMESTAMPTZ  DEFAULT NOW(),
+    UNIQUE(user_id, place_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_favorites_user ON user_favorites(user_id);
+
+-- ============================================================
+-- reviews (사용자 리뷰 — Phase 2)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS reviews (
+    review_id   UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+    place_id    UUID         NOT NULL REFERENCES places(place_id) ON DELETE CASCADE,
+    user_id     UUID         REFERENCES users(user_id) ON DELETE SET NULL,
+    text        TEXT         NOT NULL,
+    stars       SMALLINT     CHECK(stars BETWEEN 1 AND 5),
+    summary     TEXT,
+    created_at  TIMESTAMPTZ  DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_reviews_place ON reviews(place_id);
+
+-- ============================================================
+-- conversations (채팅 세션 메타 — langgraph checkpoint와 별도)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS conversations (
+    chat_id      UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id      UUID         REFERENCES users(user_id) ON DELETE SET NULL,
+    title        VARCHAR(200),
+    last_message TEXT,
+    created_at   TIMESTAMPTZ  DEFAULT NOW(),
+    updated_at   TIMESTAMPTZ  DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_conv_user ON conversations(user_id, updated_at DESC);
