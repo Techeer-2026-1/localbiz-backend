@@ -13,7 +13,7 @@ langgraph-checkpoint-postgres==2.0.8
 # Database
 asyncpg==0.30.0
 psycopg[binary,pool]==3.2.3
-aioredis==2.0.1
+redis[hiredis]>=5.0.0
 opensearch-py==2.7.1
 
 # External API
