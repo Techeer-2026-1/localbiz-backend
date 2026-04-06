@@ -13,8 +13,19 @@ class Settings(BaseSettings):
     app_env: str = "development"
     secret_key: str = "dev-secret-key"
 
-    # PostgreSQL
-    database_url: str = "postgresql://localbiz:localbiz@localhost:5432/localbiz"
+    # PostgreSQL (개별 변수 또는 DATABASE_URL)
+    db_host: str = "localhost"
+    db_port: int = 5432
+    db_name: str = "postgres"
+    db_user: str = "etl"
+    db_password: str = "etl_pass"
+    database_url: str = ""
+
+    @property
+    def effective_database_url(self) -> str:
+        if self.database_url:
+            return self.database_url
+        return f"postgresql://{self.db_user}:{self.db_password}@{self.db_host}:{self.db_port}/{self.db_name}"
 
     # Redis
     redis_url: str = "redis://localhost:6379"
