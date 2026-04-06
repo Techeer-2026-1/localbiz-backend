@@ -1,10 +1,12 @@
 """리뷰 비교 도구 — place_analysis 테이블에서 분석 데이터 조회 및 차트 생성"""
+
 from __future__ import annotations
 
 import json
-from typing import Optional
+
 from langchain_core.tools import tool
-from backend.src.db.postgres import fetch_all, fetch_one
+
+from backend.src.db.postgres import fetch_one
 
 DIMENSIONS = [
     ("score_taste", "맛"),
@@ -50,9 +52,10 @@ async def compare_reviews(place_names: str) -> str:
     if len(rows) < 2:
         found = [r["place_name"] for r in rows]
         missing = [n for n in names if not any(n in f for f in found)]
-        return json.dumps({
-            "error": f"분석 데이터가 부족합니다. 찾은 장소: {found}, 미발견: {missing}. 배치 분석이 필요합니다."
-        }, ensure_ascii=False)
+        return json.dumps(
+            {"error": f"분석 데이터가 부족합니다. 찾은 장소: {found}, 미발견: {missing}. 배치 분석이 필요합니다."},
+            ensure_ascii=False,
+        )
 
     # ── 레이더차트 데이터 ──
     chart_data = []
@@ -81,23 +84,22 @@ async def compare_reviews(place_names: str) -> str:
         if isinstance(keywords, str):
             keywords = json.loads(keywords)
 
-        sources.append({
-            "place_name": r["place_name"],
-            "avg_rating": float(r["avg_rating"]) if r.get("avg_rating") else None,
-            "total_reviews": r.get("total_reviews"),
-            "source_breakdown": source_breakdown,
-            "analyzed_at": str(r.get("analyzed_at", "")),
-            "summary": r.get("summary"),
-            "keywords": keywords,
-            "sample_reviews": {
-                "google": google_samples,
-                "naver": naver_samples,
-            },
-            "scores": {
-                label: float(r.get(key) or 0)
-                for key, label in DIMENSIONS
-            },
-        })
+        sources.append(
+            {
+                "place_name": r["place_name"],
+                "avg_rating": float(r["avg_rating"]) if r.get("avg_rating") else None,
+                "total_reviews": r.get("total_reviews"),
+                "source_breakdown": source_breakdown,
+                "analyzed_at": str(r.get("analyzed_at", "")),
+                "summary": r.get("summary"),
+                "keywords": keywords,
+                "sample_reviews": {
+                    "google": google_samples,
+                    "naver": naver_samples,
+                },
+                "scores": {label: float(r.get(key) or 0) for key, label in DIMENSIONS},
+            }
+        )
 
     result = {
         "chart": {

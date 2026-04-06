@@ -1,11 +1,11 @@
 """사용자 날짜 표현 → (date_from, date_to, query_token) 변환"""
-from datetime import date, timedelta
-from typing import Optional, Tuple
-from calendar import monthrange
+
 import re
+from calendar import monthrange
+from datetime import date, timedelta
 
 
-def parse_date_expression(expr: str, base: Optional[date] = None) -> Tuple[str, str, str]:
+def parse_date_expression(expr: str, base: date | None = None) -> tuple[str, str, str]:
     """
     사용자 날짜 표현을 파싱하여 (date_from, date_to, 쿼리토큰) 반환.
 
@@ -33,14 +33,14 @@ def parse_date_expression(expr: str, base: Optional[date] = None) -> Tuple[str, 
     # ── 이번 주 ──────────────────────────────────────────────────────────
     if re.search(r"이번\s*주(?!말)", expr):
         start = today - timedelta(days=weekday)
-        end   = start + timedelta(days=6)
+        end = start + timedelta(days=6)
         token = f"{year}년 {today.month}월 {_week_of_month(today)}주"
         return start.isoformat(), end.isoformat(), token
 
     # ── 다음 주 ──────────────────────────────────────────────────────────
     if re.search(r"다음\s*주(?!말)", expr):
         start = today - timedelta(days=weekday) + timedelta(days=7)
-        end   = start + timedelta(days=6)
+        end = start + timedelta(days=6)
         token = f"{year}년 {start.month}월 {_week_of_month(start)}주"
         return start.isoformat(), end.isoformat(), token
 
@@ -73,7 +73,7 @@ def parse_date_expression(expr: str, base: Optional[date] = None) -> Tuple[str, 
     # ── 이번 달 ──────────────────────────────────────────────────────────
     if re.search(r"이번\s*달|이번\s*월", expr):
         last = monthrange(year, today.month)[1]
-        end  = date(year, today.month, last)
+        end = date(year, today.month, last)
         token = f"{year}년 {today.month}월"
         return today.isoformat(), end.isoformat(), token
 
@@ -149,10 +149,10 @@ def build_event_queries(
     검색 쿼리 조합 생성 (뉴스/블로그 공용)
     반환: 우선순위 높은 순 쿼리 리스트 (최대 3개)
     """
-    loc  = location or "서울"
-    cat  = category or "행사"
+    loc = location or "서울"
+    cat = category or "행사"
     free = " 무료" if is_free else ""
-    kw   = f" {keyword}" if keyword else ""
+    kw = f" {keyword}" if keyword else ""
 
     queries = [
         f"{loc} {cat}{free} {date_token}{kw}",

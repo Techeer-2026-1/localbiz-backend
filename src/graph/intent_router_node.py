@@ -1,9 +1,12 @@
 """Intent Router — Gemini로 12개 의도 분류"""
+
 import os
-from langchain_google_genai import ChatGoogleGenerativeAI
+
 from langchain_core.messages import HumanMessage, SystemMessage
-from backend.src.graph.state import AgentState
+from langchain_google_genai import ChatGoogleGenerativeAI
+
 from backend.src.config import get_settings
+from backend.src.graph.state import AgentState
 
 settings = get_settings()
 
@@ -43,14 +46,24 @@ async def intent_router(state: AgentState) -> dict:
     ]
 
     VALID_INTENTS = {
-        "PLACE_SEARCH", "PLACE_RECOMMEND", "EVENT_SEARCH", "COURSE_PLAN",
-        "ANALYSIS", "DETAIL_INQUIRY", "COST_ESTIMATE", "CROWDEDNESS",
-        "BOOKING", "REVIEW_WRITE", "FAVORITE", "GENERAL"
+        "PLACE_SEARCH",
+        "PLACE_RECOMMEND",
+        "EVENT_SEARCH",
+        "COURSE_PLAN",
+        "ANALYSIS",
+        "DETAIL_INQUIRY",
+        "COST_ESTIMATE",
+        "CROWDEDNESS",
+        "BOOKING",
+        "REVIEW_WRITE",
+        "FAVORITE",
+        "GENERAL",
     }
 
     try:
         response = await llm.ainvoke(messages)
         import json
+
         result = json.loads(response.content)
         intent = result.get("intent", "GENERAL")
         if intent not in VALID_INTENTS:

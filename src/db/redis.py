@@ -1,13 +1,15 @@
 """Redis 클라이언트 — 외부 API 응답 캐싱 전용"""
+
 import json
+from typing import Any
+
 import aioredis
-from typing import Any, Optional, Union
-import aioredis
+
 from backend.src.config import get_settings
 
 settings = get_settings()
 
-_redis: Optional[aioredis.Redis] = None
+_redis: aioredis.Redis | None = None
 
 
 async def get_redis() -> aioredis.Redis:
@@ -33,7 +35,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-async def cache_get(key: str) -> Optional[Any]:
+async def cache_get(key: str) -> Any | None:
     try:
         r = await get_redis()
         value = await r.get(key)

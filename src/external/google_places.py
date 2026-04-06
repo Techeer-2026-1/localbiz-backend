@@ -1,5 +1,7 @@
 """Google Places API 클라이언트"""
+
 import httpx
+
 from backend.src.config import get_settings
 
 settings = get_settings()
@@ -27,21 +29,23 @@ async def text_search(query: str, location: str = "서울", limit: int = 5) -> l
         if r.get("photos"):
             photo_ref = r["photos"][0].get("photo_reference")
 
-        results.append({
-            "place_id": r.get("place_id", ""),
-            "name": r.get("name", ""),
-            "address": r.get("formatted_address", ""),
-            "lat": r.get("geometry", {}).get("location", {}).get("lat", 0),
-            "lng": r.get("geometry", {}).get("location", {}).get("lng", 0),
-            "rating": r.get("rating"),
-            "user_ratings_total": r.get("user_ratings_total"),
-            "price_level": r.get("price_level"),
-            "is_open": r.get("opening_hours", {}).get("open_now"),
-            "types": r.get("types", []),
-            "image_url": get_photo_url(photo_ref) if photo_ref else None,
-            "google_maps_url": f"https://www.google.com/maps/place/?q=place_id:{r.get('place_id', '')}",
-            "_source": "google_places",
-        })
+        results.append(
+            {
+                "place_id": r.get("place_id", ""),
+                "name": r.get("name", ""),
+                "address": r.get("formatted_address", ""),
+                "lat": r.get("geometry", {}).get("location", {}).get("lat", 0),
+                "lng": r.get("geometry", {}).get("location", {}).get("lng", 0),
+                "rating": r.get("rating"),
+                "user_ratings_total": r.get("user_ratings_total"),
+                "price_level": r.get("price_level"),
+                "is_open": r.get("opening_hours", {}).get("open_now"),
+                "types": r.get("types", []),
+                "image_url": get_photo_url(photo_ref) if photo_ref else None,
+                "google_maps_url": f"https://www.google.com/maps/place/?q=place_id:{r.get('place_id', '')}",
+                "_source": "google_places",
+            }
+        )
 
     return results
 
@@ -51,7 +55,7 @@ async def get_place_detail(google_place_id: str) -> dict:
     params = {
         "place_id": google_place_id,
         "fields": "name,rating,user_ratings_total,opening_hours,formatted_phone_number,"
-                  "price_level,photos,current_opening_hours,editorial_summary",
+        "price_level,photos,current_opening_hours,editorial_summary",
         "key": settings.google_places_api_key,
         "language": "ko",
     }
@@ -85,7 +89,8 @@ async def get_place_reviews(google_place_id: str) -> list[dict]:
                 "author": r.get("author_name", ""),
                 "source": "google",
             }
-            for r in reviews if r.get("text")
+            for r in reviews
+            if r.get("text")
         ]
     except Exception:
         return []
@@ -94,9 +99,7 @@ async def get_place_reviews(google_place_id: str) -> list[dict]:
 def get_photo_url(photo_reference: str, max_width: int = 400) -> str:
     """photo_reference → Places Photos API URL 구성"""
     return (
-        f"{PHOTOS_API_BASE}?maxwidth={max_width}"
-        f"&photo_reference={photo_reference}"
-        f"&key={settings.google_places_api_key}"
+        f"{PHOTOS_API_BASE}?maxwidth={max_width}&photo_reference={photo_reference}&key={settings.google_places_api_key}"
     )
 
 

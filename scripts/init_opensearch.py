@@ -1,6 +1,8 @@
 """OpenSearch 인덱스 생성 스크립트 (v4 — Gemini 768d, nori 분석기)"""
+
 import asyncio
 import os
+
 from dotenv import load_dotenv
 from opensearchpy import AsyncOpenSearch
 
@@ -35,18 +37,18 @@ PLACES_VECTOR_MAPPING = {
     "settings": NORI_SETTINGS,
     "mappings": {
         "properties": {
-            "place_id":        {"type": "keyword"},
-            "name":            {"type": "text", "analyzer": "nori_analyzer"},
-            "page_content":    {"type": "text", "analyzer": "nori_analyzer"},
-            "embedding":       {"type": "knn_vector", "dimension": 768, "method": KNN_METHOD},
-            "image_caption":   {"type": "text", "analyzer": "nori_analyzer"},
+            "place_id": {"type": "keyword"},
+            "name": {"type": "text", "analyzer": "nori_analyzer"},
+            "page_content": {"type": "text", "analyzer": "nori_analyzer"},
+            "embedding": {"type": "knn_vector", "dimension": 768, "method": KNN_METHOD},
+            "image_caption": {"type": "text", "analyzer": "nori_analyzer"},
             "image_embedding": {"type": "knn_vector", "dimension": 768, "method": KNN_METHOD},
-            "category":        {"type": "keyword"},
-            "sub_category":    {"type": "keyword"},
-            "district":        {"type": "keyword"},
-            "source":          {"type": "keyword"},
-            "lat":             {"type": "float"},
-            "lng":             {"type": "float"},
+            "category": {"type": "keyword"},
+            "sub_category": {"type": "keyword"},
+            "district": {"type": "keyword"},
+            "source": {"type": "keyword"},
+            "lat": {"type": "float"},
+            "lng": {"type": "float"},
         }
     },
 }
@@ -56,17 +58,17 @@ PLACE_REVIEWS_MAPPING = {
     "settings": NORI_SETTINGS,
     "mappings": {
         "properties": {
-            "review_id":       {"type": "keyword"},
-            "place_id":        {"type": "keyword"},
-            "place_name":      {"type": "text", "analyzer": "nori_analyzer"},
-            "summary_text":    {"type": "text", "analyzer": "nori_analyzer"},
-            "embedding":       {"type": "knn_vector", "dimension": 768, "method": KNN_METHOD},
-            "keywords":        {"type": "keyword"},
-            "stars":           {"type": "float"},
-            "source":          {"type": "keyword"},
-            "category":        {"type": "keyword"},
-            "district":        {"type": "keyword"},
-            "analyzed_at":     {"type": "date"},
+            "review_id": {"type": "keyword"},
+            "place_id": {"type": "keyword"},
+            "place_name": {"type": "text", "analyzer": "nori_analyzer"},
+            "summary_text": {"type": "text", "analyzer": "nori_analyzer"},
+            "embedding": {"type": "knn_vector", "dimension": 768, "method": KNN_METHOD},
+            "keywords": {"type": "keyword"},
+            "stars": {"type": "float"},
+            "source": {"type": "keyword"},
+            "category": {"type": "keyword"},
+            "district": {"type": "keyword"},
+            "analyzed_at": {"type": "date"},
         }
     },
 }
@@ -76,15 +78,15 @@ EVENTS_VECTOR_MAPPING = {
     "settings": NORI_SETTINGS,
     "mappings": {
         "properties": {
-            "event_id":        {"type": "keyword"},
-            "title":           {"type": "text", "analyzer": "nori_analyzer"},
-            "description":     {"type": "text", "analyzer": "nori_analyzer"},
-            "embedding":       {"type": "knn_vector", "dimension": 768, "method": KNN_METHOD},
-            "category":        {"type": "keyword"},
-            "district":        {"type": "keyword"},
-            "date_start":      {"type": "date"},
-            "date_end":        {"type": "date"},
-            "source":          {"type": "keyword"},
+            "event_id": {"type": "keyword"},
+            "title": {"type": "text", "analyzer": "nori_analyzer"},
+            "description": {"type": "text", "analyzer": "nori_analyzer"},
+            "embedding": {"type": "knn_vector", "dimension": 768, "method": KNN_METHOD},
+            "category": {"type": "keyword"},
+            "district": {"type": "keyword"},
+            "date_start": {"type": "date"},
+            "date_end": {"type": "date"},
+            "source": {"type": "keyword"},
         }
     },
 }

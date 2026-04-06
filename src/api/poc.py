@@ -7,12 +7,14 @@
   3. Photos API URL 구성 (photo_reference → URL)
   4. Redis 캐싱 (X-Cache 헤더로 HIT/MISS 노출)
 """
+
 import hashlib
-import json
 import time
+
 import httpx
 from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
+
 from backend.src.config import get_settings
 from backend.src.db.redis import cache_get, cache_set
 
@@ -80,10 +82,7 @@ async def poc_place_detail(google_place_id: str):
     if photos and api_key:
         photo_ref = photos[0].get("photo_reference", "")
         if photo_ref:
-            image_url = (
-                f"{PLACES_API}/photo"
-                f"?maxwidth=600&photo_reference={photo_ref}&key={api_key}"
-            )
+            image_url = f"{PLACES_API}/photo?maxwidth=600&photo_reference={photo_ref}&key={api_key}"
 
     # ── 영업 여부 ──
     cur_hours = result.get("current_opening_hours", {})
@@ -95,6 +94,7 @@ async def poc_place_detail(google_place_id: str):
     today_hours = None
     if weekday_text:
         import datetime
+
         today_idx = datetime.date.today().weekday()  # 0=월, 6=일
         if today_idx < len(weekday_text):
             today_hours = weekday_text[today_idx]
@@ -102,12 +102,13 @@ async def poc_place_detail(google_place_id: str):
     # ── 딥링크 ──
     name = result.get("name", "")
     from urllib.parse import quote
+
     name_enc = quote(name)
 
     payload = {
         "place_id": google_place_id,
         "name": name,
-        "category": "restaurant",       # Nearby Search 없이 단독 호출 시 기본값
+        "category": "restaurant",  # Nearby Search 없이 단독 호출 시 기본값
         "sub_category": None,
         "address": result.get("formatted_address"),
         "phone": result.get("formatted_phone_number"),
@@ -200,8 +201,12 @@ def _mock_place(place_id: str) -> dict:
         "is_open": True,
         "today_hours": "월요일: 07:00~22:00",
         "all_weekday_hours": [
-            "일요일: 08:00~21:00", "월요일: 07:00~22:00", "화요일: 07:00~22:00",
-            "수요일: 07:00~22:00", "목요일: 07:00~22:00", "금요일: 07:00~22:00",
+            "일요일: 08:00~21:00",
+            "월요일: 07:00~22:00",
+            "화요일: 07:00~22:00",
+            "수요일: 07:00~22:00",
+            "목요일: 07:00~22:00",
+            "금요일: 07:00~22:00",
             "토요일: 08:00~21:00",
         ],
         "naver_map_url": "https://map.naver.com/v5/search/%EC%8A%A4%ED%83%80%EB%B2%85%EC%8A%A4%20%EA%B0%95%EB%82%A8%EB%8C%80%EB%A1%9C%EC%A0%90",

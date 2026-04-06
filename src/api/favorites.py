@@ -1,13 +1,14 @@
 """즐겨찾기 관리 API"""
-from typing import List, Optional
+
 from fastapi import APIRouter, Header, HTTPException
-from backend.src.db.postgres import fetch_all, execute
+
+from backend.src.db.postgres import execute, fetch_all
 
 router = APIRouter(prefix="/api/v1/favorites", tags=["favorites"])
 
 
 @router.get("")
-async def get_favorites(x_user_id: Optional[str] = Header(default=None)):
+async def get_favorites(x_user_id: str | None = Header(default=None)):
     """사용자의 즐겨찾기 목록 조회"""
     if not x_user_id:
         return []
@@ -30,7 +31,7 @@ async def get_favorites(x_user_id: Optional[str] = Header(default=None)):
 @router.post("/{place_id}")
 async def add_favorite(
     place_id: str,
-    x_user_id: Optional[str] = Header(default=None),
+    x_user_id: str | None = Header(default=None),
 ):
     """즐겨찾기 추가"""
     if not x_user_id:
@@ -38,8 +39,7 @@ async def add_favorite(
 
     try:
         await execute(
-            "INSERT INTO user_favorites (user_id, place_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
-            x_user_id, place_id
+            "INSERT INTO user_favorites (user_id, place_id) VALUES ($1, $2) ON CONFLICT DO NOTHING", x_user_id, place_id
         )
         return {"status": "ok"}
     except Exception as e:
@@ -49,17 +49,14 @@ async def add_favorite(
 @router.delete("/{place_id}")
 async def remove_favorite(
     place_id: str,
-    x_user_id: Optional[str] = Header(default=None),
+    x_user_id: str | None = Header(default=None),
 ):
     """즐겨찾기 삭제"""
     if not x_user_id:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
     try:
-        await execute(
-            "DELETE FROM user_favorites WHERE user_id = $1 AND place_id = $2",
-            x_user_id, place_id
-        )
+        await execute("DELETE FROM user_favorites WHERE user_id = $1 AND place_id = $2", x_user_id, place_id)
         return {"status": "ok"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

@@ -1,14 +1,16 @@
 """Place Recommend Node — 조건/취향 기반 맞춤 장소 추천 (네이버 블로그 리뷰 연동)"""
+
+import asyncio
+import json
 import os
 import re
-import json
-import asyncio
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_core.messages import HumanMessage, SystemMessage
 
+from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_google_genai import ChatGoogleGenerativeAI
+
+from backend.src.external.google_places import get_place_reviews, text_search
+from backend.src.external.naver_blog import search_blog
 from backend.src.graph.state import AgentState
-from backend.src.external.google_places import text_search, get_place_reviews
-from backend.src.external.naver_blog import search_blog, summarize_reviews
 
 CONDITION_EXTRACT_SYSTEM = """사용자의 장소 추천 요청에서 추천 조건을 추출하세요.
 
@@ -45,10 +47,9 @@ llm_json = ChatGoogleGenerativeAI(
 async def _multi_search(queries: list[str], location: str, limit: int) -> list[dict]:
     """여러 쿼리를 병렬로 검색하고 place_id 기준 중복 제거 후 상위 limit개 반환"""
     fetch_per_query = max(limit, 5)
-    results = await asyncio.gather(*[
-        text_search(query=q, location=location, limit=fetch_per_query)
-        for q in queries
-    ], return_exceptions=True)
+    results = await asyncio.gather(
+        *[text_search(query=q, location=location, limit=fetch_per_query) for q in queries], return_exceptions=True
+    )
 
     seen: set[str] = set()
     merged: list[dict] = []
@@ -78,15 +79,13 @@ def _rerank(reviews: list[dict], conditions: list[str], top_k: int = 5) -> list[
     return sorted(reviews, key=score, reverse=True)[:top_k]
 
 
-async def _fetch_all_reviews(
-    place: dict, category: str, conditions: list[str]
-) -> tuple[str, list[dict]]:
+async def _fetch_all_reviews(place: dict, category: str, conditions: list[str]) -> tuple[str, list[dict]]:
     """Naver Blog + Google Places 리뷰를 병렬로 수집 → 리랭킹 → (요약 텍스트, 참조 링크)"""
     place_name = place["name"]
-    place_id   = place.get("place_id", "")
+    place_id = place.get("place_id", "")
 
     # 병렬 수집
-    naver_task  = search_blog(f"{place_name} {category}", display=10)
+    naver_task = search_blog(f"{place_name} {category}", display=10)
     google_task = get_place_reviews(place_id) if place_id else asyncio.sleep(0, result=[])
 
     naver_items, google_reviews = await asyncio.gather(naver_task, google_task)
@@ -108,7 +107,8 @@ async def _fetch_all_reviews(
             "link": item.get("link", ""),
             "title": re.sub(r"<[^>]+>", "", item.get("title", "")).strip(),
         }
-        for item in naver_filtered if item.get("description")
+        for item in naver_filtered
+        if item.get("description")
     ]
 
     # 전체 리뷰 합산 → 리랭킹
@@ -119,7 +119,8 @@ async def _fetch_all_reviews(
     review_text = "\n".join(
         f"[{'구글' if r.get('source') == 'google' else '네이버'}] "
         f"{'★' * (r['rating'] if r.get('rating') else 0)} {r['text'][:200]}"
-        for r in ranked if r.get("text")
+        for r in ranked
+        if r.get("text")
     )
 
     # 참조 링크 (네이버만 링크 있음)
@@ -138,10 +139,12 @@ async def place_recommend_node(state: AgentState) -> dict:
 
     # 1) 추천 조건 + 다중 쿼리 추출
     try:
-        param_response = await llm_json.ainvoke([
-            SystemMessage(content=CONDITION_EXTRACT_SYSTEM),
-            HumanMessage(content=user_message),
-        ])
+        param_response = await llm_json.ainvoke(
+            [
+                SystemMessage(content=CONDITION_EXTRACT_SYSTEM),
+                HumanMessage(content=user_message),
+            ]
+        )
         params = json.loads(param_response.content)
     except Exception:
         params = {
@@ -165,37 +168,39 @@ async def place_recommend_node(state: AgentState) -> dict:
     if not places:
         return {
             "places": [],
-            "response_blocks": [{
-                "type": "text_stream",
-                "system": None,
-                "prompt": f"조건에 맞는 장소를 찾지 못했어. 다른 조건이나 지역으로 시도해보라고 한국어로 안내해줘.",
-            }],
+            "response_blocks": [
+                {
+                    "type": "text_stream",
+                    "system": None,
+                    "prompt": "조건에 맞는 장소를 찾지 못했어. 다른 조건이나 지역으로 시도해보라고 한국어로 안내해줘.",
+                }
+            ],
             "messages": [HumanMessage(content=user_message)],
         }
 
     # 3) 네이버 블로그 후기 병렬 수집 (장소명 + 지역 검색)
-    review_results = await asyncio.gather(*[
-        _fetch_all_reviews(p, category, conditions) for p in places
-    ])
+    review_results = await asyncio.gather(*[_fetch_all_reviews(p, category, conditions) for p in places])
     review_texts = [r[0] for r in review_results]
-    review_refs  = [r[1] for r in review_results]
+    review_refs = [r[1] for r in review_results]
 
     # 4) 응답 블록 생성
     response_blocks = []
 
-    response_blocks.append({
-        "type": "text_stream",
-        "system": "당신은 서울 로컬 생활 정보 전문 어시스턴트입니다. 친근하고 간결하게 한국어로 답변하세요.",
-        "prompt": (
-            f"사용자 요청: {user_message}\n"
-            f"추출된 조건: {conditions_text}\n"
-            f"검색 지역: {location}\n\n"
-            f"이 조건으로 {len(places)}곳을 찾았다고 한두 문장으로 간략히 안내해줘. "
-            f"장소 목록은 아래에 따로 보여줄 거니까 설명은 짧게."
-        ),
-    })
+    response_blocks.append(
+        {
+            "type": "text_stream",
+            "system": "당신은 서울 로컬 생활 정보 전문 어시스턴트입니다. 친근하고 간결하게 한국어로 답변하세요.",
+            "prompt": (
+                f"사용자 요청: {user_message}\n"
+                f"추출된 조건: {conditions_text}\n"
+                f"검색 지역: {location}\n\n"
+                f"이 조건으로 {len(places)}곳을 찾았다고 한두 문장으로 간략히 안내해줘. "
+                f"장소 목록은 아래에 따로 보여줄 거니까 설명은 짧게."
+            ),
+        }
+    )
 
-    for p, reviews, refs in zip(places, review_texts, review_refs):
+    for p, reviews, refs in zip(places, review_texts, review_refs, strict=False):
         response_blocks.append({"type": "place", "data": p})
 
         place_info = (
@@ -207,15 +212,13 @@ async def place_recommend_node(state: AgentState) -> dict:
         )
         review_section = f"\n\n실제 방문자 블로그 후기:\n{reviews}" if reviews else "\n\n(블로그 후기 없음)"
 
-        response_blocks.append({
-            "type": "text_stream",
-            "system": RECOMMEND_REASON_SYSTEM,
-            "prompt": (
-                f"사용자 추천 조건: {conditions_text}\n\n"
-                f"장소 정보:\n{place_info}"
-                f"{review_section}"
-            ),
-        })
+        response_blocks.append(
+            {
+                "type": "text_stream",
+                "system": RECOMMEND_REASON_SYSTEM,
+                "prompt": (f"사용자 추천 조건: {conditions_text}\n\n장소 정보:\n{place_info}{review_section}"),
+            }
+        )
 
         if refs:
             response_blocks.append({"type": "references", "items": refs})

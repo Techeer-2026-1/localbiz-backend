@@ -1,9 +1,12 @@
 """Conversation Agent — Gemini 직접 응답"""
+
 import os
-from langchain_google_genai import ChatGoogleGenerativeAI
+
 from langchain_core.messages import HumanMessage, SystemMessage
-from backend.src.graph.state import AgentState
+from langchain_google_genai import ChatGoogleGenerativeAI
+
 from backend.src.config import get_settings
+from backend.src.graph.state import AgentState
 
 settings = get_settings()
 
@@ -27,18 +30,23 @@ async def conversation_agent(state: AgentState) -> dict:
     messages.append(HumanMessage(content=state["user_message"]))
 
     # 프롬프트를 블록으로 반환 — websocket이 직접 스트리밍
-    history_text = "\n".join(
-        f"{'user' if m.__class__.__name__ == 'HumanMessage' else 'assistant'}: {m.content}"
-        for m in history[-6:]
-    ) if history else ""
+    history_text = (
+        "\n".join(
+            f"{'user' if m.__class__.__name__ == 'HumanMessage' else 'assistant'}: {m.content}" for m in history[-6:]
+        )
+        if history
+        else ""
+    )
 
     prompt = f"{history_text}\nuser: {state['user_message']}" if history_text else state["user_message"]
 
     return {
-        "response_blocks": [{
-            "type": "text_stream",
-            "system": CONVERSATION_SYSTEM_PROMPT,
-            "prompt": prompt,
-        }],
+        "response_blocks": [
+            {
+                "type": "text_stream",
+                "system": CONVERSATION_SYSTEM_PROMPT,
+                "prompt": prompt,
+            }
+        ],
         "messages": [HumanMessage(content=state["user_message"])],
     }

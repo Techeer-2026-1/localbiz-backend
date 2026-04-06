@@ -1,7 +1,8 @@
 """장소 분석 API — 리뷰 비교 레이더차트 데이터 제공"""
+
 from fastapi import APIRouter, HTTPException, Query
-from typing import Optional
-from backend.src.db.postgres import fetch_one, fetch_all
+
+from backend.src.db.postgres import fetch_all, fetch_one
 
 router = APIRouter(prefix="/api/v1", tags=["analysis"])
 
@@ -31,7 +32,7 @@ async def compare_places(
         raise HTTPException(400, "최대 5개 장소까지 비교 가능합니다.")
 
     # IN 절 생성 ($1, $2, $3...)
-    placeholders = ", ".join(f"${i+1}" for i in range(len(place_ids)))
+    placeholders = ", ".join(f"${i + 1}" for i in range(len(place_ids)))
     rows = await fetch_all(
         f"SELECT * FROM place_analysis WHERE place_id IN ({placeholders})",
         *place_ids,
@@ -46,12 +47,16 @@ async def compare_places(
     # Recharts 레이더 차트 포맷
     dimensions = ["맛", "서비스", "분위기", "가성비", "청결도", "접근성"]
     score_keys = [
-        "score_taste", "score_service", "score_atmosphere",
-        "score_value", "score_cleanliness", "score_accessibility",
+        "score_taste",
+        "score_service",
+        "score_atmosphere",
+        "score_value",
+        "score_cleanliness",
+        "score_accessibility",
     ]
 
     chart_data = []
-    for dim, key in zip(dimensions, score_keys):
+    for dim, key in zip(dimensions, score_keys, strict=False):
         entry = {"dimension": dim}
         for a in analyses:
             entry[a["place_name"]] = a["scores"].get(key) or 0

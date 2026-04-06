@@ -1,5 +1,7 @@
 """Google Calendar MCP 클라이언트 래퍼"""
+
 import httpx
+
 from backend.src.config import get_settings
 
 settings = get_settings()

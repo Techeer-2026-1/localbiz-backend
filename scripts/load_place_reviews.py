@@ -10,22 +10,21 @@ Usage:
     python scripts/load_place_reviews.py               # 전체 적재
 """
 
-from typing import Optional
-import asyncio
 import argparse
-import json
+import asyncio
 import logging
 import time
 
 from dotenv import load_dotenv
+
 load_dotenv("backend/.env")
 load_dotenv(".env")
 
-from backend.src.config import get_settings
-from backend.src.db.postgres import get_pool, fetch_all
 from embed_utils import embed_texts
-
 from opensearchpy import OpenSearch, helpers
+
+from backend.src.config import get_settings
+from backend.src.db.postgres import fetch_all, get_pool
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -70,8 +69,8 @@ async def load_reviews(dry_run: bool = False, batch_size: int = 200):
         summary_texts.append(f"{row['summary'] or ''} 키워드: {kw}")
 
     if dry_run:
-        for i, (row, text) in enumerate(zip(rows[:5], summary_texts[:5])):
-            logger.info(f"[{i+1}] {row['place_name']}: {text[:100]}...")
+        for i, (row, text) in enumerate(zip(rows[:5], summary_texts[:5], strict=False)):
+            logger.info(f"[{i + 1}] {row['place_name']}: {text[:100]}...")
         logger.info(f"--dry-run: {len(rows)}건 중 샘플 5개 출력 완료")
         return
 
@@ -80,8 +79,8 @@ async def load_reviews(dry_run: bool = False, batch_size: int = 200):
     total_errors = 0
 
     for i in range(0, len(rows), batch_size):
-        batch_rows = rows[i:i + batch_size]
-        batch_texts = summary_texts[i:i + batch_size]
+        batch_rows = rows[i : i + batch_size]
+        batch_texts = summary_texts[i : i + batch_size]
 
         embeddings = embed_texts(batch_texts)
 
@@ -94,23 +93,25 @@ async def load_reviews(dry_run: bool = False, batch_size: int = 200):
             ]
             avg_score = round(sum(scores) / len(scores), 1) if scores else 0
 
-            actions.append({
-                "_index": settings.reviews_index,
-                "_id": str(row["analysis_id"]),
-                "_source": {
-                    "review_id": str(row["analysis_id"]),
-                    "place_id": str(row["place_id"]),
-                    "place_name": row["place_name"],
-                    "summary_text": batch_texts[j],
-                    "embedding": embeddings[j],
-                    "keywords": row["keywords"] or [],
-                    "stars": avg_score,
-                    "source": "place_analysis",
-                    "category": row.get("category", ""),
-                    "district": row.get("district", ""),
-                    "analyzed_at": row["analyzed_at"].isoformat() if row["analyzed_at"] else None,
-                },
-            })
+            actions.append(
+                {
+                    "_index": settings.reviews_index,
+                    "_id": str(row["analysis_id"]),
+                    "_source": {
+                        "review_id": str(row["analysis_id"]),
+                        "place_id": str(row["place_id"]),
+                        "place_name": row["place_name"],
+                        "summary_text": batch_texts[j],
+                        "embedding": embeddings[j],
+                        "keywords": row["keywords"] or [],
+                        "stars": avg_score,
+                        "source": "place_analysis",
+                        "category": row.get("category", ""),
+                        "district": row.get("district", ""),
+                        "analyzed_at": row["analyzed_at"].isoformat() if row["analyzed_at"] else None,
+                    },
+                }
+            )
 
         success, errors = helpers.bulk(os_client, actions)
         total_indexed += success

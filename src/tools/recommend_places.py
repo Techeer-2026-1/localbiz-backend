@@ -1,15 +1,16 @@
 """장소 추천 도구 — asyncio.gather 4-way 병렬 (SQL 0.3 + Vector 0.4 + Places 0.2 + Trend 0.1)"""
-import asyncio
-from langchain_core.tools import tool
-from langchain_anthropic import ChatAnthropic
-from langchain_core.messages import HumanMessage, SystemMessage
 
-from backend.src.db.postgres import fetch_all
-from backend.src.db.opensearch import knn_search
-from backend.src.external.google_places import get_place_detail
-from backend.src.external.naver_blog import search_blog, extract_trend_score
-from backend.src.utils.embedding import embed_text
+import asyncio
+
+from langchain_anthropic import ChatAnthropic
+from langchain_core.messages import HumanMessage
+from langchain_core.tools import tool
+
 from backend.src.config import get_settings
+from backend.src.db.opensearch import knn_search
+from backend.src.db.postgres import fetch_all
+from backend.src.external.naver_blog import extract_trend_score, search_blog
+from backend.src.utils.embedding import embed_text
 
 settings = get_settings()
 
@@ -48,7 +49,10 @@ async def recommend_places(
     trend_task = _naver_trend_search(query)
 
     sql_r, vector_r, places_r, trend_r = await asyncio.gather(
-        sql_task, vector_task, places_task, trend_task,
+        sql_task,
+        vector_task,
+        places_task,
+        trend_task,
         return_exceptions=True,
     )
 
@@ -58,7 +62,7 @@ async def recommend_places(
     def safe_list(r) -> list:
         return r if isinstance(r, list) else []
 
-    _accumulate(safe_list(sql_r),    scores, place_data, WEIGHTS["sql"],    "sql")
+    _accumulate(safe_list(sql_r), scores, place_data, WEIGHTS["sql"], "sql")
     _accumulate(safe_list(vector_r), scores, place_data, WEIGHTS["vector"], "vector")
     _accumulate(safe_list(places_r), scores, place_data, WEIGHTS["places"], "places")
     _accumulate_trend(safe_list(trend_r), scores, WEIGHTS["trend"])
@@ -80,23 +84,27 @@ async def recommend_places(
 async def _sql_search(query, category, district, lat, lng) -> list[dict]:
     conditions, params, idx = ["1=1"], [], 1
     if category:
-        conditions.append(f"category = ${idx}"); params.append(category); idx += 1
+        conditions.append(f"category = ${idx}")
+        params.append(category)
+        idx += 1
     if district:
-        conditions.append(f"district = ${idx}"); params.append(district); idx += 1
+        conditions.append(f"district = ${idx}")
+        params.append(district)
+        idx += 1
     if query:
         conditions.append(f"(name ILIKE ${idx} OR raw_data::text ILIKE ${idx})")
-        params.append(f"%{query}%"); idx += 1
+        params.append(f"%{query}%")
+        idx += 1
     if lat and lng:
-        conditions.append(
-            f"ST_DWithin(geom::geography, ST_MakePoint(${idx}, ${idx+1})::geography, 3000)"
-        )
-        params.extend([lng, lat]); idx += 2
+        conditions.append(f"ST_DWithin(geom::geography, ST_MakePoint(${idx}, ${idx + 1})::geography, 3000)")
+        params.extend([lng, lat])
+        idx += 2
 
     sql = f"""
         SELECT place_id::text, name, category, address, district,
                ST_X(geom) AS lng, ST_Y(geom) AS lat,
                image_url, google_place_id, booking_url, phone
-        FROM places WHERE {' AND '.join(conditions)}
+        FROM places WHERE {" AND ".join(conditions)}
         ORDER BY name LIMIT 20
     """
     return await fetch_all(sql, *params)
@@ -112,14 +120,17 @@ async def _vector_search(query, category, district) -> list[dict]:
     if district:
         metadata_filter["district"] = district
     hits = await knn_search("places_vector", vec, k=20, metadata_filter=metadata_filter or None)
-    return [{"place_id": h.get("place_id"), "_score": h.get("_score", 0),
-             "name": h.get("metadata", {}).get("name", "")} for h in hits]
+    return [
+        {"place_id": h.get("place_id"), "_score": h.get("_score", 0), "name": h.get("metadata", {}).get("name", "")}
+        for h in hits
+    ]
 
 
 async def _google_places_search(query, category, lat, lng) -> list[dict]:
     if not (lat and lng and settings.google_places_api_key):
         return []
     from backend.src.external.google_places import search_nearby
+
     return await search_nearby(lat, lng, category or "establishment", radius=2000, keyword=query)
 
 
@@ -154,12 +165,13 @@ async def _add_recommendation_reasons(query: str, places: list[dict]) -> None:
     names = [p.get("name", "") for p in places]
     prompt = f"""사용자가 "{query}"를 원합니다.
 다음 장소들에 대해 각각 한 문장의 추천 이유를 작성하세요 (20자 이내, 자연스러운 한국어).
-장소 목록: {', '.join(names)}
+장소 목록: {", ".join(names)}
 JSON 배열로만 응답: ["이유1", "이유2", ...]"""
 
     try:
         resp = await llm.ainvoke([HumanMessage(content=prompt)])
         import json
+
         reasons = json.loads(resp.content)
         for i, place in enumerate(places):
             if i < len(reasons):

@@ -1,5 +1,7 @@
 """WebSocket 응답 블록 타입 정의 — Discriminated Union"""
-from typing import Literal, Union, Any, List, Optional, Dict
+
+from typing import Any, Literal, Union
+
 from pydantic import BaseModel
 
 
@@ -23,19 +25,19 @@ class Place(BaseModel):
     place_id: str
     name: str
     category: str
-    sub_category: Optional[str] = None
-    address: Optional[str] = None
-    district: Optional[str] = None
-    lat: Optional[float] = None
-    lng: Optional[float] = None
-    phone: Optional[str] = None
-    image_url: Optional[str] = None        # Google Places Photos API URL
-    rating: Optional[float] = None
-    is_open: Optional[bool] = None         # 현재 영업 여부 (Google Places 실시간)
-    booking_url: Optional[str] = None
-    naver_map_url: Optional[str] = None
-    kakao_map_url: Optional[str] = None
-    recommendation_reason: Optional[str] = None   # 추천 근거 문구
+    sub_category: str | None = None
+    address: str | None = None
+    district: str | None = None
+    lat: float | None = None
+    lng: float | None = None
+    phone: str | None = None
+    image_url: str | None = None  # Google Places Photos API URL
+    rating: float | None = None
+    is_open: bool | None = None  # 현재 영업 여부 (Google Places 실시간)
+    booking_url: str | None = None
+    naver_map_url: str | None = None
+    kakao_map_url: str | None = None
+    recommendation_reason: str | None = None  # 추천 근거 문구
 
 
 class PlaceBlock(BaseModel):
@@ -45,27 +47,27 @@ class PlaceBlock(BaseModel):
 
 class PlacesBlock(BaseModel):
     type: Literal["places"] = "places"
-    data: List[Place]
+    data: list[Place]
 
 
 class Event(BaseModel):
     event_id: str
     title: str
     category: str
-    place_name: Optional[str] = None
-    address: Optional[str] = None
-    lat: Optional[float] = None
-    lng: Optional[float] = None
-    date_start: Optional[str] = None
-    date_end: Optional[str] = None
-    price: Optional[str] = None
-    poster_url: Optional[str] = None      # KOPIS/TourAPI 이미지 URL
-    detail_url: Optional[str] = None
+    place_name: str | None = None
+    address: str | None = None
+    lat: float | None = None
+    lng: float | None = None
+    date_start: str | None = None
+    date_end: str | None = None
+    price: str | None = None
+    poster_url: str | None = None  # KOPIS/TourAPI 이미지 URL
+    detail_url: str | None = None
 
 
 class EventsBlock(BaseModel):
     type: Literal["events"] = "events"
-    data: List[Event]
+    data: list[Event]
 
 
 class MapMarker(BaseModel):
@@ -83,23 +85,23 @@ class CourseStop(BaseModel):
     category: str
     lat: float
     lng: float
-    time: Optional[str] = None
-    duration_min: Optional[int] = None
-    walk_to_next_min: Optional[int] = None
+    time: str | None = None
+    duration_min: int | None = None
+    walk_to_next_min: int | None = None
 
 
 class CourseBlock(BaseModel):
     type: Literal["course"] = "course"
-    date: Optional[str] = None
-    area: Optional[str] = None
-    stops: List[CourseStop]
+    date: str | None = None
+    area: str | None = None
+    stops: list[CourseStop]
 
 
 class MapMarkersBlock(BaseModel):
     type: Literal["map_markers"] = "map_markers"
-    center: Dict[str, float]           # {"lat": 37.5, "lng": 127.0}
+    center: dict[str, float]  # {"lat": 37.5, "lng": 127.0}
     zoom: int = 14
-    markers: List[MapMarker]
+    markers: list[MapMarker]
 
 
 class RouteStop(BaseModel):
@@ -107,31 +109,31 @@ class RouteStop(BaseModel):
     name: str
     lat: float
     lng: float
-    time: Optional[str] = None            # "10:00"
-    duration_min: Optional[int] = None    # 체류 시간(분)
-    walk_to_next_min: Optional[int] = None
+    time: str | None = None  # "10:00"
+    duration_min: int | None = None  # 체류 시간(분)
+    walk_to_next_min: int | None = None
 
 
 class MapRouteBlock(BaseModel):
     type: Literal["map_route"] = "map_route"
-    stops: List[RouteStop]
-    polyline: Optional[List[List[float]]] = None  # [[lat, lng], ...]
+    stops: list[RouteStop]
+    polyline: list[list[float]] | None = None  # [[lat, lng], ...]
 
 
 class ChartBlock(BaseModel):
     type: Literal["chart"] = "chart"
-    chart_type: str   # "bar" | "radar" | "line"
-    title: Optional[str] = None
-    data: List[Dict[str, Any]]
-    keys: List[str]   # recharts dataKey 목록
+    chart_type: str  # "bar" | "radar" | "line"
+    title: str | None = None
+    data: list[dict[str, Any]]
+    keys: list[str]  # recharts dataKey 목록
 
 
 class CalendarResult(BaseModel):
-    event_id: Optional[str] = None
+    event_id: str | None = None
     title: str
     datetime: str
-    location: Optional[str] = None
-    status: str = "created"           # "created" | "failed"
+    location: str | None = None
+    status: str = "created"  # "created" | "failed"
 
 
 class CalendarBlock(BaseModel):
@@ -142,27 +144,27 @@ class CalendarBlock(BaseModel):
 class Reference(BaseModel):
     title: str
     link: str
-    postdate: Optional[str] = None
-    source: Optional[str] = None
+    postdate: str | None = None
+    source: str | None = None
 
 
 class ReferencesBlock(BaseModel):
     type: Literal["references"] = "references"
-    data: List[Reference]
+    data: list[Reference]
 
 
 class AnalysisSourcesBlock(BaseModel):
     type: Literal["analysis_sources"] = "analysis_sources"
     place_name: str
-    review_count: Optional[int] = None
-    sources: Optional[Dict[str, int]] = None
-    sample_reviews: Optional[List[str]] = None
+    review_count: int | None = None
+    sources: dict[str, int] | None = None
+    sample_reviews: list[str] | None = None
 
 
 class FavoritesBlock(BaseModel):
     type: Literal["favorites"] = "favorites"
-    data: List[Place]
-    action: str = "list"               # "list" | "added" | "removed"
+    data: list[Place]
+    action: str = "list"  # "list" | "added" | "removed"
 
 
 class DoneBlock(BaseModel):

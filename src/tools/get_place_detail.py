@@ -1,7 +1,9 @@
 """장소 상세 정보 도구 — PostgreSQL + Google Places 실시간 병합"""
+
 from langchain_core.tools import tool
+
 from backend.src.db.postgres import fetch_one
-from backend.src.external.google_places import get_place_detail, get_photo_url
+from backend.src.external.google_places import get_photo_url, get_place_detail
 
 
 @tool
@@ -37,9 +39,7 @@ async def get_place_detail(place_id: str) -> dict:
             result["rating"] = detail.get("rating")
             result["user_ratings_total"] = detail.get("user_ratings_total")
             result["price_level"] = detail.get("price_level")
-            result["is_open"] = (
-                detail.get("current_opening_hours", {}).get("open_now")
-            )
+            result["is_open"] = detail.get("current_opening_hours", {}).get("open_now")
             # 대표 이미지 URL (photo_reference 기반)
             photos = detail.get("photos", [])
             if photos:

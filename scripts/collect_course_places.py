@@ -1,15 +1,16 @@
 """코스 추천용 장소 데이터 수집 — Google Places Text Search → PostgreSQL places 테이블"""
+
 from __future__ import annotations
 
 import asyncio
 import json
-import sys
 import os
+import sys
 import uuid
+
 import httpx
 import psycopg2
 from psycopg2.extras import execute_values
-from datetime import datetime
 
 # ── 설정 ──────────────────────────────────────────────
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
@@ -24,15 +25,26 @@ PLACES_API = "https://maps.googleapis.com/maps/api/place"
 # ── 수집 대상 ─────────────────────────────────────────
 # 서울 주요 권역 (검색 반경 중심)
 AREAS = [
-    "홍대", "연남동", "합정",
-    "강남역", "신사동 가로수길",
-    "성수동", "건대입구",
-    "이태원", "한남동",
-    "종로", "북촌", "익선동",
-    "여의도", "영등포",
-    "망원동", "상수",
-    "을지로", "충무로",
-    "잠실", "송파",
+    "홍대",
+    "연남동",
+    "합정",
+    "강남역",
+    "신사동 가로수길",
+    "성수동",
+    "건대입구",
+    "이태원",
+    "한남동",
+    "종로",
+    "북촌",
+    "익선동",
+    "여의도",
+    "영등포",
+    "망원동",
+    "상수",
+    "을지로",
+    "충무로",
+    "잠실",
+    "송파",
 ]
 
 # 코스에 사용되는 카테고리 (course_plan_node의 _DURATION_MAP 기반)
@@ -51,14 +63,30 @@ CATEGORIES = [
 
 # 자치구 매핑 (주소에서 추출)
 DISTRICT_MAP = {
-    "마포구": "mapo", "서대문구": "seodaemun", "용산구": "yongsan",
-    "강남구": "gangnam", "서초구": "seocho", "송파구": "songpa",
-    "성동구": "seongdong", "광진구": "gwangjin", "종로구": "jongno",
-    "중구": "jung", "영등포구": "yeongdeungpo", "강동구": "gangdong",
-    "동대문구": "dongdaemun", "성북구": "seongbuk", "강서구": "gangseo",
-    "양천구": "yangcheon", "구로구": "guro", "금천구": "geumcheon",
-    "관악구": "gwanak", "동작구": "dongjak", "노원구": "nowon",
-    "도봉구": "dobong", "강북구": "gangbuk", "중랑구": "jungnang",
+    "마포구": "mapo",
+    "서대문구": "seodaemun",
+    "용산구": "yongsan",
+    "강남구": "gangnam",
+    "서초구": "seocho",
+    "송파구": "songpa",
+    "성동구": "seongdong",
+    "광진구": "gwangjin",
+    "종로구": "jongno",
+    "중구": "jung",
+    "영등포구": "yeongdeungpo",
+    "강동구": "gangdong",
+    "동대문구": "dongdaemun",
+    "성북구": "seongbuk",
+    "강서구": "gangseo",
+    "양천구": "yangcheon",
+    "구로구": "guro",
+    "금천구": "geumcheon",
+    "관악구": "gwanak",
+    "동작구": "dongjak",
+    "노원구": "nowon",
+    "도봉구": "dobong",
+    "강북구": "gangbuk",
+    "중랑구": "jungnang",
     "은평구": "eunpyeong",
 }
 
@@ -93,19 +121,21 @@ async def search_places(query: str, limit: int = 5) -> list[dict]:
         if r.get("photos"):
             photo_ref = r["photos"][0].get("photo_reference")
 
-        results.append({
-            "google_place_id": r.get("place_id", ""),
-            "name": r.get("name", ""),
-            "address": r.get("formatted_address", ""),
-            "lat": r.get("geometry", {}).get("location", {}).get("lat"),
-            "lng": r.get("geometry", {}).get("location", {}).get("lng"),
-            "rating": r.get("rating"),
-            "user_ratings_total": r.get("user_ratings_total"),
-            "price_level": r.get("price_level"),
-            "is_open": r.get("opening_hours", {}).get("open_now"),
-            "types": r.get("types", []),
-            "photo_ref": photo_ref,
-        })
+        results.append(
+            {
+                "google_place_id": r.get("place_id", ""),
+                "name": r.get("name", ""),
+                "address": r.get("formatted_address", ""),
+                "lat": r.get("geometry", {}).get("location", {}).get("lat"),
+                "lng": r.get("geometry", {}).get("location", {}).get("lng"),
+                "rating": r.get("rating"),
+                "user_ratings_total": r.get("user_ratings_total"),
+                "price_level": r.get("price_level"),
+                "is_open": r.get("opening_hours", {}).get("open_now"),
+                "types": r.get("types", []),
+                "photo_ref": photo_ref,
+            }
+        )
     return results
 
 
@@ -138,11 +168,7 @@ async def get_business_hours(google_place_id: str) -> dict | None:
 
 
 def get_photo_url(photo_ref: str) -> str:
-    return (
-        f"{PLACES_API}/photo?maxwidth=400"
-        f"&photo_reference={photo_ref}"
-        f"&key={GOOGLE_KEY}"
-    )
+    return f"{PLACES_API}/photo?maxwidth=400&photo_reference={photo_ref}&key={GOOGLE_KEY}"
 
 
 def insert_places(places: list[dict]):
@@ -163,25 +189,27 @@ def insert_places(places: list[dict]):
 
     values = []
     for p in places:
-        values.append((
-            str(uuid.uuid4()),
-            p["name"],
-            p["category"],
-            p.get("sub_category"),
-            p.get("address"),
-            p.get("district"),
-            p.get("lat"),
-            p.get("lng"),
-            None,  # phone
-            p.get("google_place_id"),
-            p.get("image_url"),
-            json.dumps(p.get("business_hours")) if p.get("business_hours") else None,
-            json.dumps(p.get("attributes", {})),
-            None,  # booking_url
-            p.get("estimated_stay_min", 60),
-            json.dumps(p.get("raw_data", {})),
-            "google_places",
-        ))
+        values.append(
+            (
+                str(uuid.uuid4()),
+                p["name"],
+                p["category"],
+                p.get("sub_category"),
+                p.get("address"),
+                p.get("district"),
+                p.get("lat"),
+                p.get("lng"),
+                None,  # phone
+                p.get("google_place_id"),
+                p.get("image_url"),
+                json.dumps(p.get("business_hours")) if p.get("business_hours") else None,
+                json.dumps(p.get("attributes", {})),
+                None,  # booking_url
+                p.get("estimated_stay_min", 60),
+                json.dumps(p.get("raw_data", {})),
+                "google_places",
+            )
+        )
 
     sql = """
         INSERT INTO places (
@@ -211,8 +239,9 @@ def insert_places(places: list[dict]):
         conn.close()
 
 
-async def collect_area_category(area: str, cat_label: str, cat_code: str, stay_min: int,
-                                 fetch_hours: bool = False) -> list[dict]:
+async def collect_area_category(
+    area: str, cat_label: str, cat_code: str, stay_min: int, fetch_hours: bool = False
+) -> list[dict]:
     """단일 권역+카테고리 조합 수집"""
     query = f"{cat_label} {area} 서울"
     raw_places = await search_places(query, limit=5)
@@ -229,32 +258,35 @@ async def collect_area_category(area: str, cat_label: str, cat_code: str, stay_m
             hours = await get_business_hours(rp["google_place_id"])
             await asyncio.sleep(0.1)  # rate limit
 
-        collected.append({
-            "name": rp["name"],
-            "category": cat_code,
-            "sub_category": cat_label,
-            "address": address,
-            "district": extract_district(address),
-            "lat": rp.get("lat"),
-            "lng": rp.get("lng"),
-            "google_place_id": rp.get("google_place_id"),
-            "image_url": get_photo_url(rp["photo_ref"]) if rp.get("photo_ref") else None,
-            "business_hours": hours,
-            "estimated_stay_min": stay_min,
-            "attributes": {
-                "rating": rp.get("rating"),
-                "user_ratings_total": rp.get("user_ratings_total"),
-                "price_level": rp.get("price_level"),
-                "google_types": rp.get("types", []),
-            },
-            "raw_data": rp,
-        })
+        collected.append(
+            {
+                "name": rp["name"],
+                "category": cat_code,
+                "sub_category": cat_label,
+                "address": address,
+                "district": extract_district(address),
+                "lat": rp.get("lat"),
+                "lng": rp.get("lng"),
+                "google_place_id": rp.get("google_place_id"),
+                "image_url": get_photo_url(rp["photo_ref"]) if rp.get("photo_ref") else None,
+                "business_hours": hours,
+                "estimated_stay_min": stay_min,
+                "attributes": {
+                    "rating": rp.get("rating"),
+                    "user_ratings_total": rp.get("user_ratings_total"),
+                    "price_level": rp.get("price_level"),
+                    "google_types": rp.get("types", []),
+                },
+                "raw_data": rp,
+            }
+        )
 
     return collected
 
 
 async def main():
     import argparse
+
     parser = argparse.ArgumentParser(description="코스 추천용 장소 데이터 수집")
     parser.add_argument("--areas", nargs="*", help="수집할 권역 (기본: 전체)")
     parser.add_argument("--categories", nargs="*", help="수집할 카테고리 (기본: 전체)")

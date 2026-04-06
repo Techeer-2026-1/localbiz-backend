@@ -1,15 +1,17 @@
 """Event Search Node — 네이버 뉴스/블로그 검색 기반 행사 정보 추출"""
-import os
-import json
+
 import asyncio
+import json
+import os
 import re
 from datetime import date
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_core.messages import HumanMessage, SystemMessage
 
+from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_google_genai import ChatGoogleGenerativeAI
+
+from backend.src.external.naver_blog import search_blog, search_news
 from backend.src.graph.state import AgentState
-from backend.src.external.naver_blog import search_news, search_blog
-from backend.src.utils.date_parser import parse_date_expression, build_event_queries
+from backend.src.utils.date_parser import build_event_queries, parse_date_expression
 
 EXTRACT_SYSTEM = """당신은 뉴스/블로그 검색 결과에서 행사·이벤트·축제 정보를 구조화해 추출하는 전문가입니다.
 
@@ -111,10 +113,44 @@ async def event_search_node(state: AgentState) -> dict:
     is_free = True if "무료" in user_message else (False if "유료" in user_message else None)
     keyword = ""
     # 남은 명사 힌트 추출 (카테고리/날짜/지역 제거 후 나머지)
-    cleaned = re.sub(r"(이번|다음|주말|주중|평일|오늘|내일|\d+월|\d+일|무료|유료|서울|" + "|".join(
-        ["홍대", "강남", "이태원", "성수", "종로", "잠실", "신촌", "마포", "용산", "강북",
-         "공연", "전시", "축제", "체험", "콘서트", "뮤지컬", "연극", "영화", "스포츠",
-         "행사", "이벤트", "알려줘", "찾아줘", "추천", "뭐", "있어", "있나", "없나"]) + ")", "", user_message)
+    cleaned = re.sub(
+        r"(이번|다음|주말|주중|평일|오늘|내일|\d+월|\d+일|무료|유료|서울|"
+        + "|".join(
+            [
+                "홍대",
+                "강남",
+                "이태원",
+                "성수",
+                "종로",
+                "잠실",
+                "신촌",
+                "마포",
+                "용산",
+                "강북",
+                "공연",
+                "전시",
+                "축제",
+                "체험",
+                "콘서트",
+                "뮤지컬",
+                "연극",
+                "영화",
+                "스포츠",
+                "행사",
+                "이벤트",
+                "알려줘",
+                "찾아줘",
+                "추천",
+                "뭐",
+                "있어",
+                "있나",
+                "없나",
+            ]
+        )
+        + ")",
+        "",
+        user_message,
+    )
     keyword = cleaned.strip()
 
     # 3) 검색 쿼리 생성
@@ -132,15 +168,17 @@ async def event_search_node(state: AgentState) -> dict:
     response_blocks = []
 
     if not search_text.strip():
-        response_blocks.append({
-            "type": "text_stream",
-            "system": None,
-            "prompt": (
-                f"사용자가 '{user_message}'를 요청했지만 관련 행사 정보를 찾지 못했습니다. "
-                f"검색 조건({date_token}, {category or '카테고리 미지정'}, {location})으로 결과가 없었으니 "
-                f"날짜 범위를 넓히거나 다른 키워드를 사용해보라고 한국어로 안내해줘."
-            ),
-        })
+        response_blocks.append(
+            {
+                "type": "text_stream",
+                "system": None,
+                "prompt": (
+                    f"사용자가 '{user_message}'를 요청했지만 관련 행사 정보를 찾지 못했습니다. "
+                    f"검색 조건({date_token}, {category or '카테고리 미지정'}, {location})으로 결과가 없었으니 "
+                    f"날짜 범위를 넓히거나 다른 키워드를 사용해보라고 한국어로 안내해줘."
+                ),
+            }
+        )
         return {
             "events": [],
             "response_blocks": response_blocks,
@@ -155,10 +193,12 @@ async def event_search_node(state: AgentState) -> dict:
         f"검색 결과:\n{search_text[:4000]}"
     )
     try:
-        resp = await llm_json.ainvoke([
-            SystemMessage(content=EXTRACT_SYSTEM),
-            HumanMessage(content=extract_prompt),
-        ])
+        resp = await llm_json.ainvoke(
+            [
+                SystemMessage(content=EXTRACT_SYSTEM),
+                HumanMessage(content=extract_prompt),
+            ]
+        )
         raw = resp.content.strip()
         # JSON 배열 추출
         m = re.search(r"\[.*\]", raw, re.DOTALL)
@@ -189,17 +229,19 @@ async def event_search_node(state: AgentState) -> dict:
     card_events = (high_events + medium_events)[:5]
 
     if not card_events:
-        response_blocks.append({
-            "type": "text_stream",
-            "system": None,
-            "prompt": (
-                f"사용자 요청: {user_message}\n"
-                f"검색 기간: {date_from} ~ {date_to}\n\n"
-                f"검색은 됐지만 구체적인 행사 정보를 추출하기 어려웠습니다. "
-                f"아래 검색 내용을 바탕으로 관련 행사·이벤트를 요약해서 한국어로 안내해줘:\n\n"
-                f"{search_text[:1500]}"
-            ),
-        })
+        response_blocks.append(
+            {
+                "type": "text_stream",
+                "system": None,
+                "prompt": (
+                    f"사용자 요청: {user_message}\n"
+                    f"검색 기간: {date_from} ~ {date_to}\n\n"
+                    f"검색은 됐지만 구체적인 행사 정보를 추출하기 어려웠습니다. "
+                    f"아래 검색 내용을 바탕으로 관련 행사·이벤트를 요약해서 한국어로 안내해줘:\n\n"
+                    f"{search_text[:1500]}"
+                ),
+            }
+        )
         return {
             "events": [],
             "response_blocks": response_blocks,
@@ -216,14 +258,13 @@ async def event_search_node(state: AgentState) -> dict:
         f"{e.get('price', '요금 미정')}"
         for e in card_events
     )
-    response_blocks.append({
-        "type": "text_stream",
-        "system": SUMMARY_SYSTEM,
-        "prompt": (
-            f"사용자 요청: {user_message}\n\n"
-            f"검색된 행사 {len(card_events)}건:\n{event_summary}"
-        ),
-    })
+    response_blocks.append(
+        {
+            "type": "text_stream",
+            "system": SUMMARY_SYSTEM,
+            "prompt": (f"사용자 요청: {user_message}\n\n검색된 행사 {len(card_events)}건:\n{event_summary}"),
+        }
+    )
 
     return {
         "events": card_events,

@@ -1,6 +1,6 @@
 """Response Composer — AgentState → 최종 response_blocks 정리"""
+
 from backend.src.graph.state import AgentState
-from typing import Dict, List
 
 
 async def response_composer(state: AgentState) -> dict:
@@ -17,8 +17,8 @@ async def response_composer(state: AgentState) -> dict:
     # 중복 타입 제거 (마지막 것 유지), 순서 정렬
     # text_stream, chart 등은 여러 개 허용
     ALLOW_MULTIPLE = {"text", "text_stream", "chart", "references", "analysis_sources"}
-    seen_types: Dict[str, Dict] = {}
-    multi_blocks: List[Dict] = []
+    seen_types: dict[str, dict] = {}
+    multi_blocks: list[dict] = []
 
     for block in blocks:
         t = block.get("type", "text")

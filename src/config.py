@@ -1,5 +1,6 @@
-from pydantic_settings import BaseSettings, SettingsConfigDict
 from functools import lru_cache
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -46,8 +47,8 @@ class Settings(BaseSettings):
     jaeger_port: int = 6831
 
     # Cache TTL (seconds)
-    google_places_ttl: int = 86400   # 24h
-    naver_blog_ttl: int = 21600      # 6h
+    google_places_ttl: int = 86400  # 24h
+    naver_blog_ttl: int = 21600  # 6h
 
     # OpenSearch index names
     places_index: str = "places_vector"

@@ -1,18 +1,22 @@
 """FastAPI 앱 진입점"""
+
 import logging
+
 from dotenv import load_dotenv
+
 load_dotenv("backend/.env")
 load_dotenv(".env")
 from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.src.config import get_settings
-from backend.src.db.postgres import get_pool, close_pool
+from backend.src.api.analysis import router as analysis_router
 from backend.src.api.chats import router as chats_router
 from backend.src.api.favorites import router as favorites_router
 from backend.src.api.poc import router as poc_router
-from backend.src.api.analysis import router as analysis_router
+from backend.src.config import get_settings
+from backend.src.db.postgres import close_pool, get_pool
 from backend.src.websocket import chat_websocket
 
 logger = logging.getLogger(__name__)
@@ -28,6 +32,7 @@ async def lifespan(app: FastAPI):
         logger.warning(f"PostgreSQL 연결 실패 — DB 기능 제한됨: {e}")
 
     from backend.src.graph.real_builder import build_graph
+
     await build_graph()
     logger.info("LangGraph 빌드 완료")
 
@@ -72,6 +77,8 @@ async def websocket_endpoint(websocket: WebSocket, chat_id: str):
 async def health():
     return {"status": "ok"}
 
+
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run("backend.src.entry:app", host="0.0.0.0", port=8000)

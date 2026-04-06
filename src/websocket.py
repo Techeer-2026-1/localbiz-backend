@@ -1,12 +1,15 @@
 """WebSocket 엔드포인트 — 채팅의 모든 기능 처리"""
-import os
+
 import json
 import logging
+import os
+
 from fastapi import WebSocket, WebSocketDisconnect
+from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_core.messages import SystemMessage, HumanMessage
-from backend.src.graph.real_builder import get_graph
+
 from backend.src.db.postgres import execute
+from backend.src.graph.real_builder import get_graph
 
 _stream_llm = ChatGoogleGenerativeAI(
     model="gemini-2.5-flash",
@@ -98,10 +101,12 @@ async def chat_websocket(websocket: WebSocket, chat_id: str):
             except Exception as e:
                 logger.error(f"Error in graph execution: {e}")
                 try:
-                    await websocket.send_json({
-                        "type": "text",
-                        "content": f"처리 중 오류가 발생했습니다: {str(e)}",
-                    })
+                    await websocket.send_json(
+                        {
+                            "type": "text",
+                            "content": f"처리 중 오류가 발생했습니다: {str(e)}",
+                        }
+                    )
                     await websocket.send_json({"type": "done"})
                 except Exception:
                     return
@@ -121,7 +126,9 @@ async def _update_conversation(chat_id: str, message: str) -> None:
                 title = COALESCE(NULLIF(title, ''), $2)
             WHERE chat_id = $3
             """,
-            preview, preview[:50], chat_id,
+            preview,
+            preview[:50],
+            chat_id,
         )
     except Exception:
         pass

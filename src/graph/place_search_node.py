@@ -1,11 +1,13 @@
 """Place Search Node — Google Places Text Search 기반 웹 검색 노드"""
-import os
-import json
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_core.messages import HumanMessage, SystemMessage
 
-from backend.src.graph.state import AgentState
+import json
+import os
+
+from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_google_genai import ChatGoogleGenerativeAI
+
 from backend.src.external.google_places import text_search
+from backend.src.graph.state import AgentState
 
 PARAM_EXTRACT_SYSTEM = """사용자의 장소 검색 요청에서 검색 파라미터를 추출하세요.
 
@@ -35,10 +37,12 @@ async def place_search_node(state: AgentState) -> dict:
 
     # 1) 검색 파라미터 추출 (limit 포함)
     try:
-        param_response = await llm.ainvoke([
-            SystemMessage(content=PARAM_EXTRACT_SYSTEM),
-            HumanMessage(content=user_message),
-        ])
+        param_response = await llm.ainvoke(
+            [
+                SystemMessage(content=PARAM_EXTRACT_SYSTEM),
+                HumanMessage(content=user_message),
+            ]
+        )
         params = json.loads(param_response.content)
     except Exception:
         params = {"query": user_message, "location": "서울", "limit": 3}
@@ -69,17 +73,21 @@ async def place_search_node(state: AgentState) -> dict:
                 f" ({p.get('user_ratings_total', 0)}개 리뷰)\n"
                 f"영업 여부: {'영업중' if p.get('is_open') else '영업종료' if p.get('is_open') is False else '정보 없음'}"
             )
-            response_blocks.append({
-                "type": "text_stream",
-                "system": PLACE_DESC_SYSTEM,
-                "prompt": place_info,
-            })
+            response_blocks.append(
+                {
+                    "type": "text_stream",
+                    "system": PLACE_DESC_SYSTEM,
+                    "prompt": place_info,
+                }
+            )
     else:
-        response_blocks.append({
-            "type": "text_stream",
-            "system": None,
-            "prompt": f"'{query}' 검색 결과가 없어. 다른 검색어로 시도해보라고 한국어로 안내해줘.",
-        })
+        response_blocks.append(
+            {
+                "type": "text_stream",
+                "system": None,
+                "prompt": f"'{query}' 검색 결과가 없어. 다른 검색어로 시도해보라고 한국어로 안내해줘.",
+            }
+        )
 
     return {
         "places": places,

@@ -1,0 +1,43 @@
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+
+[tool.ruff.lint]
+select = [
+    "E",     # pycodestyle errors
+    "W",     # pycodestyle warnings
+    "F",     # pyflakes
+    "I",     # isort
+    "B",     # flake8-bugbear
+    "S",     # flake8-bandit (security)
+    "UP",    # pyupgrade
+]
+ignore = [
+    "E501",  # line too long (ruff format handles this)
+    "S101",  # assert usage (OK in tests)
+    "S104",  # binding to 0.0.0.0
+    "S105",  # hardcoded password (config defaults)
+    "S110",  # try-except-pass (기존 코드)
+    "S112",  # try-except-continue (기존 코드)
+    "S324",  # md5 (cache key용, 보안 무관)
+    "S608",  # SQL injection (파라미터 바인딩 사용 중)
+    "B008",  # function call in default arg (FastAPI Depends)
+    "B904",  # raise from (기존 코드)
+    "UP007", # X | Y union syntax (Python 3.9 호환)
+    "E702",  # multiple statements on one line (기존 코드)
+    "F811",  # redefinition (@tool decorator)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"scripts/*" = ["S603", "S607", "E402"]  # subprocess + dotenv requires late imports
+"src/entry.py" = ["E402"]
+"src/db/redis.py" = ["E402"]
+"src/graph/*" = ["B007"]  # loop variable not used in body (intentional)
+"tests/*" = ["S101"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["backend"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
