@@ -1,0 +1,42 @@
+# Web Framework
+fastapi==0.115.4
+uvicorn[standard]==0.30.6
+python-multipart==0.0.9
+websockets==13.1
+
+# LangGraph / LangChain
+langgraph==0.2.55
+langchain-anthropic==0.3.0
+langchain-ollama==0.2.2
+langgraph-checkpoint-postgres==2.0.8
+
+# Database
+asyncpg==0.30.0
+psycopg[binary,pool]==3.2.3
+aioredis==2.0.1
+opensearch-py==2.7.1
+
+# External API
+httpx==0.27.2
+anthropic==0.40.0
+# openai 제거 — 임베딩을 Gemini text-embedding-004로 전환
+
+# Data Processing
+pandas==2.2.3
+numpy==1.26.4
+
+# Monitoring
+prometheus-fastapi-instrumentator==7.0.0
+opentelemetry-sdk==1.28.1
+opentelemetry-exporter-jaeger==1.20.0
+opentelemetry-instrumentation-fastapi==0.49b1
+
+# Config / Utils
+pydantic-settings==2.6.1
+python-dateutil==2.9.0
+pytz==2024.2
+
+# Testing
+pytest==8.3.3
+pytest-asyncio==0.24.0
+httpx[test]==0.27.2

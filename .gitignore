@@ -1,0 +1,37 @@
+# Environment
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+venv/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker volumes
+postgres_data/
+opensearch_data/
+redis_data/
+
+# ETL artifacts
+etl_errors.json
+column_profile.json
+token.json
+credentials.json
+
+# Data files
+data/
+scripts/init_db.sql.bak

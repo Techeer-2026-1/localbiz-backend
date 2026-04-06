@@ -1,0 +1,45 @@
+version: "3.9"
+
+services:
+  prometheus:
+    image: prom/prometheus:v2.54.0
+    container_name: localbiz-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.retention.time=15d'
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    container_name: localbiz-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+
+  loki:
+    image: grafana/loki:3.2.0
+    container_name: localbiz-loki
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./loki.yml:/etc/loki/local-config.yaml
+      - loki_data:/loki
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.60
+    container_name: localbiz-jaeger
+    ports:
+      - "6831:6831/udp"
+      - "16686:16686"
+
+volumes:
+  prometheus_data:
+  grafana_data:
+  loki_data:
