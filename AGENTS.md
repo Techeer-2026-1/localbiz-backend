@@ -43,3 +43,10 @@ AI 에이전트(Claude Code, Cursor, Copilot)가 이 레포에서 작업할 때 
 - 새 그래프 노드: `src/graph/` 에 `*_node.py` → `real_builder.py`에 등록 → `intent_router_logic.py`에 매핑
 - 새 도구: `src/tools/` 에 파일 → `search_agent.py` 또는 `action_agent.py`의 tools 리스트에 등록
 - 새 ETL: `scripts/` 에 파일. `embed_utils.py`의 `embed_texts()` 사용. argparse + `--dry-run` 필수
+
+## 인프라
+
+- 배포: GCP (Google Compute Engine + Cloud SQL + OpenSearch on GCE)
+- CI/CD: GitHub Actions → `.github/workflows/ci.yml` (린트+테스트), `deploy.yml` (GCE 배포)
+- 로컬: `docker-compose up -d` (PostgreSQL 5434, OpenSearch 9200, Redis 6379)
+- 모니터링: Grafana + Prometheus + Loki + Jaeger (GCE) → Slack
