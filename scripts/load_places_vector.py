@@ -12,22 +12,21 @@ Usage:
     python scripts/load_places_vector.py
 """
 
-from typing import Optional
-import asyncio
 import argparse
-import json
+import asyncio
 import logging
 import time
 
 from dotenv import load_dotenv
+
 load_dotenv("backend/.env")
 load_dotenv(".env")
 
-from backend.src.config import get_settings
-from backend.src.db.postgres import get_pool, fetch_all
 from embed_utils import embed_texts
-
 from opensearchpy import OpenSearch, helpers
+
+from backend.src.config import get_settings
+from backend.src.db.postgres import fetch_all, get_pool
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -58,13 +57,19 @@ def generate_page_content(place: dict) -> str:
     raw = place.get("raw_data") or {}
     if isinstance(raw, str):
         import json as _json
-        try: raw = _json.loads(raw)
-        except Exception: raw = {}
+
+        try:
+            raw = _json.loads(raw)
+        except Exception:
+            raw = {}
     attrs = place.get("attributes") or {}
     if isinstance(attrs, str):
         import json as _json
-        try: attrs = _json.loads(attrs)
-        except Exception: attrs = {}
+
+        try:
+            attrs = _json.loads(attrs)
+        except Exception:
+            attrs = {}
 
     attr_texts = []
     if attrs.get("wifi") or raw.get("와이파이") == "가능":
@@ -91,8 +96,8 @@ def generate_page_content(place: dict) -> str:
 
 
 async def load_places(
-    category: Optional[str] = None,
-    limit: Optional[int] = None,
+    category: str | None = None,
+    limit: int | None = None,
     dry_run: bool = False,
     batch_size: int = 500,
 ):
@@ -130,7 +135,7 @@ async def load_places(
 
     if dry_run:
         for i in range(min(5, len(rows))):
-            logger.info(f"  [{i+1}] {rows[i]['name']}: {page_contents[i][:120]}...")
+            logger.info(f"  [{i + 1}] {rows[i]['name']}: {page_contents[i][:120]}...")
         logger.info(f"--dry-run: {len(rows)}건 중 샘플 출력 완료")
         return
 
@@ -139,30 +144,32 @@ async def load_places(
     total_errors = 0
 
     for i in range(0, len(rows), batch_size):
-        batch_rows = rows[i:i + batch_size]
-        batch_contents = page_contents[i:i + batch_size]
+        batch_rows = rows[i : i + batch_size]
+        batch_contents = page_contents[i : i + batch_size]
 
         # 임베딩
         embeddings = embed_texts(batch_contents)
 
         actions = []
         for j, row in enumerate(batch_rows):
-            actions.append({
-                "_index": settings.places_index,
-                "_id": str(row["place_id"]),
-                "_source": {
-                    "place_id": str(row["place_id"]),
-                    "name": row["name"],
-                    "page_content": batch_contents[j],
-                    "embedding": embeddings[j],
-                    "category": row.get("category", ""),
-                    "sub_category": row.get("sub_category", ""),
-                    "district": row.get("district", ""),
-                    "lat": row.get("lat"),
-                    "lng": row.get("lng"),
-                    "source": row.get("source", ""),
-                },
-            })
+            actions.append(
+                {
+                    "_index": settings.places_index,
+                    "_id": str(row["place_id"]),
+                    "_source": {
+                        "place_id": str(row["place_id"]),
+                        "name": row["name"],
+                        "page_content": batch_contents[j],
+                        "embedding": embeddings[j],
+                        "category": row.get("category", ""),
+                        "sub_category": row.get("sub_category", ""),
+                        "district": row.get("district", ""),
+                        "lat": row.get("lat"),
+                        "lng": row.get("lng"),
+                        "source": row.get("source", ""),
+                    },
+                }
+            )
 
         # 제로 벡터 제거 (cosinesimil에서 거부됨)
         actions = [a for a in actions if any(v != 0.0 for v in a["_source"]["embedding"])]
@@ -184,7 +191,11 @@ if __name__ == "__main__":
     parser.add_argument("--dry-run", action="store_true", help="page_content 샘플만 출력")
     parser.add_argument("--batch-size", type=int, default=500)
     args = parser.parse_args()
-    asyncio.run(load_places(
-        category=args.category, limit=args.limit,
-        dry_run=args.dry_run, batch_size=args.batch_size,
-    ))
+    asyncio.run(
+        load_places(
+            category=args.category,
+            limit=args.limit,
+            dry_run=args.dry_run,
+            batch_size=args.batch_size,
+        )
+    )

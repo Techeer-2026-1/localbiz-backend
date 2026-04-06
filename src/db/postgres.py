@@ -1,11 +1,14 @@
 """PostgreSQL 커넥션 풀 및 쿼리 헬퍼"""
+
+from typing import Any
+
 import asyncpg
-from typing import Optional, List, Dict, Any
+
 from backend.src.config import get_settings
 
 settings = get_settings()
 
-_pool: Optional[asyncpg.Pool] = None
+_pool: asyncpg.Pool | None = None
 
 
 async def get_pool() -> asyncpg.Pool:
@@ -26,14 +29,14 @@ async def close_pool() -> None:
         _pool = None
 
 
-async def fetch_all(query: str, *args) -> List[Dict[str, Any]]:
+async def fetch_all(query: str, *args) -> list[dict[str, Any]]:
     pool = await get_pool()
     async with pool.acquire() as conn:
         rows = await conn.fetch(query, *args)
         return [dict(r) for r in rows]
 
 
-async def fetch_one(query: str, *args) -> Optional[Dict[str, Any]]:
+async def fetch_one(query: str, *args) -> dict[str, Any] | None:
     pool = await get_pool()
     async with pool.acquire() as conn:
         row = await conn.fetchrow(query, *args)

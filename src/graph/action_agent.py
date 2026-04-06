@@ -1,14 +1,16 @@
 """Action Agent — Gemini ReAct 패턴 (캘린더/즐겨찾기/예약)"""
+
 import os
+
+from langchain_core.messages import HumanMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.prebuilt import create_react_agent
-from langchain_core.messages import HumanMessage
 
+from backend.src.config import get_settings
 from backend.src.graph.state import AgentState
 from backend.src.tools.add_to_calendar import add_to_calendar, get_free_slots
-from backend.src.tools.favorites import add_favorite, remove_favorite, list_favorites
 from backend.src.tools.create_booking import create_booking
-from backend.src.config import get_settings
+from backend.src.tools.favorites import add_favorite, list_favorites, remove_favorite
 
 settings = get_settings()
 
@@ -39,6 +41,7 @@ llm = ChatGoogleGenerativeAI(
 async def action_agent(state: AgentState) -> dict:
     """Action Agent 노드"""
     from datetime import date
+
     system = ACTION_SYSTEM.format(today=date.today().isoformat())
     agent_app = create_react_agent(llm, ACTION_TOOLS, state_modifier=system)
 
@@ -65,6 +68,7 @@ async def action_agent(state: AgentState) -> dict:
         if hasattr(msg, "name"):
             try:
                 import json
+
                 content = json.loads(msg.content)
                 if isinstance(content, dict):
                     if content.get("status") == "created":  # 캘린더 추가 성공

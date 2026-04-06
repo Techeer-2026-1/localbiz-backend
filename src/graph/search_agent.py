@@ -1,18 +1,20 @@
 """Search Agent — Gemini ReAct 패턴"""
-import os
+
 import json
+import os
+
+from langchain_core.messages import HumanMessage, ToolMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.prebuilt import create_react_agent
-from langchain_core.messages import HumanMessage, ToolMessage
 
+from backend.src.config import get_settings
 from backend.src.graph.state import AgentState
-from backend.src.tools.search_places import search_places
-from backend.src.tools.search_events import search_events
-from backend.src.tools.recommend_places import recommend_places
+from backend.src.tools.compare_reviews import compare_reviews
 from backend.src.tools.get_place_detail import get_place_detail
 from backend.src.tools.get_place_reviews import get_place_reviews
-from backend.src.tools.compare_reviews import compare_reviews
-from backend.src.config import get_settings
+from backend.src.tools.recommend_places import recommend_places
+from backend.src.tools.search_events import search_events
+from backend.src.tools.search_places import search_places
 
 settings = get_settings()
 
@@ -93,15 +95,18 @@ async def search_agent(state: AgentState) -> dict:
                 "lng": p.get("lng", 0),
                 "category": p.get("category", ""),
             }
-            for p in unique_places if p.get("lat") and p.get("lng")
+            for p in unique_places
+            if p.get("lat") and p.get("lng")
         ]
         if markers:
-            response_blocks.append({
-                "type": "map_markers",
-                "center": {"lat": markers[0]["lat"], "lng": markers[0]["lng"]},
-                "zoom": 14,
-                "markers": markers,
-            })
+            response_blocks.append(
+                {
+                    "type": "map_markers",
+                    "center": {"lat": markers[0]["lat"], "lng": markers[0]["lng"]},
+                    "zoom": 14,
+                    "markers": markers,
+                }
+            )
 
     if events:
         response_blocks.append({"type": "events", "data": events})

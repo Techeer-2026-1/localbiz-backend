@@ -13,22 +13,21 @@ Usage:
     python scripts/collect_price_data.py
 """
 
-from typing import Optional
-import asyncio
 import argparse
+import asyncio
 import json
-import re
 import logging
+import re
 import time
 
 import httpx
-
 from dotenv import load_dotenv
+
 load_dotenv("backend/.env")
 load_dotenv(".env")
 
 from backend.src.config import get_settings
-from backend.src.db.postgres import get_pool, fetch_all, execute
+from backend.src.db.postgres import execute, fetch_all, get_pool
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -58,9 +57,31 @@ PRICE_FLOORS = {
 
 # ─── 서울 자치구명 ───
 SEOUL_DISTRICTS = [
-    "강남", "강동", "강북", "강서", "관악", "광진", "구로", "금천",
-    "노원", "도봉", "동대문", "동작", "마포", "서대문", "서초", "성동",
-    "성북", "송파", "양천", "영등포", "용산", "은평", "종로", "중구", "중랑",
+    "강남",
+    "강동",
+    "강북",
+    "강서",
+    "관악",
+    "광진",
+    "구로",
+    "금천",
+    "노원",
+    "도봉",
+    "동대문",
+    "동작",
+    "마포",
+    "서대문",
+    "서초",
+    "성동",
+    "성북",
+    "송파",
+    "양천",
+    "영등포",
+    "용산",
+    "은평",
+    "종로",
+    "중구",
+    "중랑",
 ]
 
 
@@ -105,11 +126,10 @@ async def search_naver_blog(query: str, display: int = 5) -> list[dict]:
         return resp.json().get("items", [])
 
 
-async def collect_price_for_place(place: dict) -> Optional[dict]:
+async def collect_price_for_place(place: dict) -> dict | None:
     """단일 장소 가격 수집 파이프라인."""
     name = place["name"]
     category = place["category"]
-    district = place.get("district", "")
 
     template = SEARCH_TEMPLATES.get(category, DEFAULT_TEMPLATE)
     query = template.format(name=name)
@@ -130,8 +150,8 @@ async def collect_price_for_place(place: dict) -> Optional[dict]:
         if name_short not in text:
             continue
 
-        # 2. 서울 자치구 포함 여부 (선택적 — 없어도 통과)
-        has_district = any(d in text for d in SEOUL_DISTRICTS)
+        # 2. 서울 자치구 포함 여부 (선택적 — 가산점용)
+        # any(d in text for d in SEOUL_DISTRICTS)
 
         # 3. 가격 추출 + 범위 필터
         prices = extract_prices(text)
@@ -151,8 +171,8 @@ async def collect_price_for_place(place: dict) -> Optional[dict]:
 
 
 async def collect_prices(
-    category: Optional[str] = None,
-    limit: Optional[int] = None,
+    category: str | None = None,
+    limit: int | None = None,
     dry_run: bool = False,
 ):
     start = time.time()
@@ -177,8 +197,8 @@ async def collect_prices(
     if dry_run:
         for row in rows[:5]:
             template = SEARCH_TEMPLATES.get(row["category"], DEFAULT_TEMPLATE)
-            logger.info(f"  [{row['category']}] {row['name']} → \"{template.format(name=row['name'])}\"")
-        logger.info(f"--dry-run: 검색어 샘플 출력 완료")
+            logger.info(f'  [{row["category"]}] {row["name"]} → "{template.format(name=row["name"])}"')
+        logger.info("--dry-run: 검색어 샘플 출력 완료")
         return
 
     success_count = 0
@@ -202,27 +222,24 @@ async def collect_prices(
                 )
                 success_count += 1
                 logger.info(
-                    f"  [{i+1}/{len(rows)}] {row['name']}: "
+                    f"  [{i + 1}/{len(rows)}] {row['name']}: "
                     f"{price_data['min_price']}~{price_data['max_price']}원 "
                     f"(avg {price_data['avg_price']}원, {price_data['sample_count']}건)"
                 )
             else:
                 fail_count += 1
                 if (i + 1) % 50 == 0:
-                    logger.info(f"  [{i+1}/{len(rows)}] 진행 중...")
+                    logger.info(f"  [{i + 1}/{len(rows)}] 진행 중...")
 
         except Exception as e:
             fail_count += 1
-            logger.warning(f"  [{i+1}/{len(rows)}] {row['name']}: 오류 — {e}")
+            logger.warning(f"  [{i + 1}/{len(rows)}] {row['name']}: 오류 — {e}")
 
         # Rate limit: 0.15초 sleep (일 25,000건 한도)
         await asyncio.sleep(0.15)
 
     elapsed = time.time() - start
-    logger.info(
-        f"완료: {success_count}건 성공, {fail_count}건 실패, "
-        f"API {api_calls}회 호출, {elapsed:.1f}초"
-    )
+    logger.info(f"완료: {success_count}건 성공, {fail_count}건 실패, API {api_calls}회 호출, {elapsed:.1f}초")
 
 
 if __name__ == "__main__":

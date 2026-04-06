@@ -13,24 +13,23 @@ Usage:
     python scripts/load_image_captions.py
 """
 
-from typing import Optional
-import asyncio
 import argparse
+import asyncio
 import base64
 import logging
 import time
 
 import httpx
-
 from dotenv import load_dotenv
+
 load_dotenv("backend/.env")
 load_dotenv(".env")
 
-from backend.src.config import get_settings
-from backend.src.db.postgres import get_pool, fetch_all
 from embed_utils import embed_texts
-
 from opensearchpy import OpenSearch, helpers
+
+from backend.src.config import get_settings
+from backend.src.db.postgres import fetch_all, get_pool
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -46,7 +45,7 @@ def get_os_client() -> OpenSearch:
     )
 
 
-async def get_photo_reference(google_place_id: str) -> Optional[str]:
+async def get_photo_reference(google_place_id: str) -> str | None:
     """Google Places Details에서 photo_reference 1개 가져오기."""
     params = {
         "place_id": google_place_id,
@@ -89,19 +88,21 @@ async def caption_image(image_bytes: bytes, media_type: str) -> str:
     message = await client.messages.create(
         model="claude-haiku-4-5-20251001",
         max_tokens=200,
-        messages=[{
-            "role": "user",
-            "content": [
-                {
-                    "type": "image",
-                    "source": {"type": "base64", "media_type": media_type, "data": img_b64},
-                },
-                {
-                    "type": "text",
-                    "text": "이 장소 사진의 분위기, 인테리어 특징, 공간 특성을 한국어 3문장으로 설명해주세요. 객관적 묘사만.",
-                },
-            ],
-        }],
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image",
+                        "source": {"type": "base64", "media_type": media_type, "data": img_b64},
+                    },
+                    {
+                        "type": "text",
+                        "text": "이 장소 사진의 분위기, 인테리어 특징, 공간 특성을 한국어 3문장으로 설명해주세요. 객관적 묘사만.",
+                    },
+                ],
+            }
+        ],
     )
     return message.content[0].text
 
@@ -110,7 +111,8 @@ async def load_captions(limit: int = 1000, dry_run: bool = False, batch_size: in
     start = time.time()
     await get_pool()
 
-    rows = await fetch_all("""
+    rows = await fetch_all(
+        """
         SELECT place_id, name, google_place_id, category
         FROM places
         WHERE google_place_id IS NOT NULL
@@ -122,7 +124,9 @@ async def load_captions(limit: int = 1000, dry_run: bool = False, batch_size: in
                 WHEN 'restaurant' THEN 3
             END
         LIMIT $1
-    """, limit)
+    """,
+        limit,
+    )
 
     logger.info(f"캡셔닝 대상: {len(rows)}건")
 
@@ -149,18 +153,18 @@ async def load_captions(limit: int = 1000, dry_run: bool = False, batch_size: in
             caption = await caption_image(image_bytes, media_type)
 
             if dry_run:
-                logger.info(f"  [{i+1}] {row['name']}: {caption}")
+                logger.info(f"  [{i + 1}] {row['name']}: {caption}")
                 if len(captions) + 1 >= 3:
-                    logger.info(f"--dry-run: 샘플 3건 완료")
+                    logger.info("--dry-run: 샘플 3건 완료")
                     return
             else:
                 captions.append(caption)
                 place_ids.append(str(row["place_id"]))
-                logger.info(f"  [{i+1}/{len(rows)}] {row['name']}: {caption[:60]}...")
+                logger.info(f"  [{i + 1}/{len(rows)}] {row['name']}: {caption[:60]}...")
 
         except Exception as e:
             skip_count += 1
-            logger.warning(f"  [{i+1}] {row['name']}: 오류 — {e}")
+            logger.warning(f"  [{i + 1}] {row['name']}: 오류 — {e}")
 
         # Rate limit
         await asyncio.sleep(0.3)
@@ -177,21 +181,23 @@ async def load_captions(limit: int = 1000, dry_run: bool = False, batch_size: in
     total_updated = 0
 
     for i in range(0, len(captions), batch_size):
-        batch_captions = captions[i:i + batch_size]
-        batch_embeddings = caption_embeddings[i:i + batch_size]
-        batch_ids = place_ids[i:i + batch_size]
+        batch_captions = captions[i : i + batch_size]
+        batch_embeddings = caption_embeddings[i : i + batch_size]
+        batch_ids = place_ids[i : i + batch_size]
 
         actions = []
         for j in range(len(batch_captions)):
-            actions.append({
-                "_op_type": "update",
-                "_index": settings.places_index,
-                "_id": batch_ids[j],
-                "doc": {
-                    "image_caption": batch_captions[j],
-                    "image_embedding": batch_embeddings[j],
-                },
-            })
+            actions.append(
+                {
+                    "_op_type": "update",
+                    "_index": settings.places_index,
+                    "_id": batch_ids[j],
+                    "doc": {
+                        "image_caption": batch_captions[j],
+                        "image_embedding": batch_embeddings[j],
+                    },
+                }
+            )
 
         success, errors = helpers.bulk(os_client, actions)
         total_updated += success

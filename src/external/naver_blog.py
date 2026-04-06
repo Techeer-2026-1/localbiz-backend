@@ -1,5 +1,7 @@
 """네이버 블로그 검색 API"""
+
 import httpx
+
 from backend.src.config import get_settings
 
 settings = get_settings()
@@ -16,7 +18,9 @@ async def _naver_search(endpoint: str, query: str, display: int, sort: str) -> l
     params = {"query": query, "display": display, "sort": sort}
     try:
         async with httpx.AsyncClient(timeout=8.0) as client:
-            response = await client.get(f"https://openapi.naver.com/v1/search/{endpoint}.json", headers=headers, params=params)
+            response = await client.get(
+                f"https://openapi.naver.com/v1/search/{endpoint}.json", headers=headers, params=params
+            )
             return response.json().get("items", [])
     except Exception:
         return []
@@ -64,6 +68,7 @@ def extract_trend_score(items: list[dict]) -> float:
     if not items:
         return 0.0
     from datetime import date, timedelta
+
     cutoff = (date.today() - timedelta(days=30)).strftime("%Y%m%d")
     recent = sum(1 for item in items if item.get("postdate", "") >= cutoff)
     return min(recent / len(items), 1.0)
@@ -72,6 +77,7 @@ def extract_trend_score(items: list[dict]) -> float:
 def summarize_reviews(items: list[dict], max_chars: int = 400) -> str:
     """블로그 후기 목록 → LLM에 넘길 텍스트로 요약"""
     import re
+
     texts = []
     total = 0
     for item in items:

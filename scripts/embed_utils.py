@@ -1,7 +1,8 @@
 """Gemini text-embedding-004 배치 임베딩 유틸 (동기, ETL 스크립트용)"""
 
-import httpx
 import logging
+
+import httpx
 from dotenv import load_dotenv
 
 load_dotenv("backend/.env")
@@ -12,10 +13,7 @@ from backend.src.config import get_settings
 settings = get_settings()
 logger = logging.getLogger(__name__)
 
-GEMINI_EMBED_URL = (
-    "https://generativelanguage.googleapis.com/v1beta/models/"
-    "gemini-embedding-001:embedContent"
-)
+GEMINI_EMBED_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent"
 DIMENSION = 768
 
 
@@ -49,11 +47,11 @@ def embed_texts(texts: list[str]) -> list[list[float]]:
     if not non_empty:
         return [[0.0] * DIMENSION for _ in texts]
 
-    indices, clean_texts = zip(*non_empty)
+    indices, clean_texts = zip(*non_empty, strict=False)
     results = [None] * len(texts)
 
     with httpx.Client() as client:
-        for j, (idx, text) in enumerate(zip(indices, clean_texts)):
+        for j, (idx, text) in enumerate(zip(indices, clean_texts, strict=False)):
             try:
                 results[idx] = _embed_one(text, client)
             except Exception as e:

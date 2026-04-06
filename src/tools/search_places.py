@@ -1,5 +1,7 @@
 """장소 검색 도구 — PostgreSQL + PostGIS 공간 쿼리 (DB 없으면 mock fallback)"""
+
 from langchain_core.tools import tool
+
 from backend.src.db.postgres import fetch_all
 
 _MOCK_PLACES = [

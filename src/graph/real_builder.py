@@ -1,20 +1,22 @@
 """LangGraph 그래프 빌더 — 노드 등록, 조건 분기, Checkpointer 설정"""
-from langgraph.graph import StateGraph, END
-from langgraph.checkpoint.memory import MemorySaver
+
 import logging
 
-from backend.src.graph.state import AgentState
-from backend.src.graph.intent_router_node import intent_router
-from backend.src.graph.intent_router_logic import route_by_intent
-from backend.src.graph.conversation import conversation_agent
-from backend.src.graph.place_search_node import place_search_node
-from backend.src.graph.place_recommend_node import place_recommend_node
-from backend.src.graph.event_search_node import event_search_node
-from backend.src.graph.course_plan_node import course_plan_node
-from backend.src.graph.search_agent import search_agent
-from backend.src.graph.action_agent import action_agent
-from backend.src.graph.response_composer import response_composer
+from langgraph.checkpoint.memory import MemorySaver
+from langgraph.graph import END, StateGraph
+
 from backend.src.config import get_settings
+from backend.src.graph.action_agent import action_agent
+from backend.src.graph.conversation import conversation_agent
+from backend.src.graph.course_plan_node import course_plan_node
+from backend.src.graph.event_search_node import event_search_node
+from backend.src.graph.intent_router_logic import route_by_intent
+from backend.src.graph.intent_router_node import intent_router
+from backend.src.graph.place_recommend_node import place_recommend_node
+from backend.src.graph.place_search_node import place_search_node
+from backend.src.graph.response_composer import response_composer
+from backend.src.graph.search_agent import search_agent
+from backend.src.graph.state import AgentState
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -30,7 +32,7 @@ async def build_graph():
         return _graph
 
     # Checkpointer 설정
-    checkpointer = MemorySaver() # 포트그레스 문제로 PoC는 메모리 고정
+    checkpointer = MemorySaver()  # 포트그레스 문제로 PoC는 메모리 고정
 
     # StateGraph 정의
     workflow = StateGraph(AgentState)
@@ -70,7 +72,7 @@ async def build_graph():
     workflow.add_edge("place_recommend", "response_composer")
     workflow.add_edge("event_search", "response_composer")
     workflow.add_edge("course_plan", "response_composer")
-    
+
     # search_agent에서 intent가 COURSE_PLAN이면 action_agent로
     def route_after_search(state: AgentState) -> str:
         if state.get("intent") == "COURSE_PLAN":

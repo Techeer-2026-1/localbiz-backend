@@ -1,6 +1,9 @@
 """예약 딥링크 생성 도구"""
+
 from urllib.parse import quote
+
 from langchain_core.tools import tool
+
 from backend.src.db.postgres import fetch_one
 
 

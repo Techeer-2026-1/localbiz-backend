@@ -1,5 +1,7 @@
 """Google Calendar 일정 추가 도구 (MCP)"""
+
 from langchain_core.tools import tool
+
 from backend.src.external.calendar_mcp import add_calendar_event
 
 
@@ -47,4 +49,5 @@ async def get_free_slots(
         duration_minutes: 필요한 소요 시간(분)
     """
     from backend.src.external.calendar_mcp import get_free_slots as _get_slots
+
     return await _get_slots(date=date, duration_minutes=duration_minutes)

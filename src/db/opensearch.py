@@ -1,12 +1,15 @@
 """OpenSearch 클라이언트 — k-NN 벡터 검색 + 메타데이터 필터링"""
-from typing import Optional, List, Dict, Any
+
+from typing import Any
+
 from opensearchpy import AsyncOpenSearch
+
 from backend.src.config import get_settings
 from backend.src.utils.embedding import embed_text
 
 settings = get_settings()
 
-_client: Optional[AsyncOpenSearch] = None
+_client: AsyncOpenSearch | None = None
 
 
 async def get_os_client() -> AsyncOpenSearch:
@@ -30,10 +33,10 @@ async def close_opensearch() -> None:
 
 async def knn_search(
     index: str,
-    query_vector: List[float],
+    query_vector: list[float],
     k: int = 10,
-    metadata_filter: Optional[Dict[str, Any]] = None,
-) -> List[Dict[str, Any]]:
+    metadata_filter: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
     """Pre-filtering + k-NN 벡터 유사도 검색."""
     client = await get_os_client()
 
@@ -48,24 +51,23 @@ async def knn_search(
         "query": {
             "bool": {
                 "filter": filter_clauses if filter_clauses else [{"match_all": {}}],
-                "must": [{
-                    "knn": {
-                        "embedding": {
-                            "vector": query_vector,
-                            "k": k,
+                "must": [
+                    {
+                        "knn": {
+                            "embedding": {
+                                "vector": query_vector,
+                                "k": k,
+                            }
                         }
                     }
-                }],
+                ],
             }
         },
     }
 
     try:
         resp = await client.search(index=index, body=body)
-        return [
-            {**hit["_source"], "_score": hit["_score"]}
-            for hit in resp["hits"]["hits"]
-        ]
+        return [{**hit["_source"], "_score": hit["_score"]} for hit in resp["hits"]["hits"]]
     except Exception:
         return []
 
@@ -75,7 +77,7 @@ async def search_places(
     category: str = None,
     district: str = None,
     k: int = 10,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """비정형 쿼리로 장소 검색."""
     vector = await embed_text(query)
     if not vector:
@@ -95,7 +97,7 @@ async def search_reviews(
     place_id: str = None,
     category: str = None,
     k: int = 10,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """리뷰 의미 검색. "서비스 좋은 곳", "분위기 아늑한" 등."""
     vector = await embed_text(query)
     if not vector:
@@ -114,7 +116,7 @@ async def search_events(
     query: str,
     category: str = None,
     k: int = 10,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """행사 의미 검색."""
     vector = await embed_text(query)
     if not vector:
@@ -131,7 +133,7 @@ async def search_by_image_caption(
     caption_query: str,
     category: str = None,
     k: int = 5,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """이미지 캡션 유사도 검색. image_embedding 필드 사용."""
     vector = await embed_text(caption_query)
     if not vector:
@@ -149,24 +151,23 @@ async def search_by_image_caption(
         "query": {
             "bool": {
                 "filter": filter_clauses,
-                "must": [{
-                    "knn": {
-                        "image_embedding": {
-                            "vector": vector,
-                            "k": k,
+                "must": [
+                    {
+                        "knn": {
+                            "image_embedding": {
+                                "vector": vector,
+                                "k": k,
+                            }
                         }
                     }
-                }],
+                ],
             }
         },
     }
 
     try:
         resp = await client.search(index=settings.places_index, body=body)
-        return [
-            {**hit["_source"], "_score": hit["_score"]}
-            for hit in resp["hits"]["hits"]
-        ]
+        return [{**hit["_source"], "_score": hit["_score"]} for hit in resp["hits"]["hits"]]
     except Exception:
         return []
 
@@ -175,8 +176,8 @@ async def text_search(
     index: str,
     query_text: str,
     limit: int = 10,
-    metadata_filter: Optional[Dict[str, Any]] = None,
-) -> List[Dict[str, Any]]:
+    metadata_filter: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
     """nori 분석기 기반 텍스트 검색 (벡터 아닌 키워드 매칭)."""
     client = await get_os_client()
 
@@ -199,22 +200,21 @@ async def text_search(
         "query": {
             "bool": {
                 "filter": filter_clauses if filter_clauses else [{"match_all": {}}],
-                "must": [{
-                    "multi_match": {
-                        "query": query_text,
-                        "fields": fields,
-                        "type": "best_fields",
+                "must": [
+                    {
+                        "multi_match": {
+                            "query": query_text,
+                            "fields": fields,
+                            "type": "best_fields",
+                        }
                     }
-                }],
+                ],
             }
         },
     }
 
     try:
         resp = await client.search(index=index, body=body)
-        return [
-            {**hit["_source"], "_score": hit["_score"]}
-            for hit in resp["hits"]["hits"]
-        ]
+        return [{**hit["_source"], "_score": hit["_score"]} for hit in resp["hits"]["hits"]]
     except Exception:
         return []

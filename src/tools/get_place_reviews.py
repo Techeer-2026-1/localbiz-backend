@@ -1,5 +1,7 @@
 """장소 리뷰 검색 도구 — OpenSearch place_reviews k-NN 검색"""
+
 from langchain_core.tools import tool
+
 from backend.src.db.opensearch import knn_search, text_search
 from backend.src.utils.embedding import embed_text
 

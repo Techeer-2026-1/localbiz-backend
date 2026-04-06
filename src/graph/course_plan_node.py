@@ -1,15 +1,17 @@
 """Course Plan Node — 카테고리별 병렬 검색 → 경로 최적화 → 타임라인 생성"""
-import os
-import json
-import asyncio
-import math
-from datetime import date
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_core.messages import HumanMessage, SystemMessage
 
-from backend.src.graph.state import AgentState
-from backend.src.external.google_places import text_search
+import asyncio
+import json
+import math
+import os
+from datetime import date
+
+from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_google_genai import ChatGoogleGenerativeAI
+
 from backend.src.external.calendar_mcp import add_calendar_event
+from backend.src.external.google_places import text_search
+from backend.src.graph.state import AgentState
 
 llm_json = ChatGoogleGenerativeAI(
     model="gemini-2.5-flash",
@@ -48,14 +50,33 @@ categories 작성 규칙:
 
 # 카테고리별 기본 소요시간 (분)
 _DURATION_MAP = {
-    "카페": 60, "커피": 60, "브런치": 90, "디저트": 45,
-    "식당": 90, "레스토랑": 90, "점심": 90, "저녁": 100, "밥": 90,
-    "전시": 120, "미술관": 120, "박물관": 120, "갤러리": 90,
-    "공원": 60, "산책": 60, "나들이": 90,
-    "쇼핑": 90, "시장": 60,
-    "문화": 90, "체험": 90, "공연": 120, "영화": 130,
-    "술": 90, "바": 90, "펍": 90,
+    "카페": 60,
+    "커피": 60,
+    "브런치": 90,
+    "디저트": 45,
+    "식당": 90,
+    "레스토랑": 90,
+    "점심": 90,
+    "저녁": 100,
+    "밥": 90,
+    "전시": 120,
+    "미술관": 120,
+    "박물관": 120,
+    "갤러리": 90,
+    "공원": 60,
+    "산책": 60,
+    "나들이": 90,
+    "쇼핑": 90,
+    "시장": 60,
+    "문화": 90,
+    "체험": 90,
+    "공연": 120,
+    "영화": 130,
+    "술": 90,
+    "바": 90,
+    "펍": 90,
 }
+
 
 def _duration(category: str) -> int:
     for key, dur in _DURATION_MAP.items():
@@ -63,16 +84,18 @@ def _duration(category: str) -> int:
             return dur
     return 60
 
+
 def _haversine_km(lat1, lng1, lat2, lng2) -> float:
     R = 6371
     dlat = math.radians(lat2 - lat1)
     dlng = math.radians(lng2 - lng1)
-    a = (math.sin(dlat / 2) ** 2
-         + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlng / 2) ** 2)
+    a = math.sin(dlat / 2) ** 2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlng / 2) ** 2
     return R * 2 * math.asin(math.sqrt(a))
+
 
 def _walk_min(km: float) -> int:
     return max(5, int(km / 0.08))  # 도보 80m/min 기준
+
 
 def _nearest_neighbor(places_by_cat: list[list[dict]], start_lat=37.5665, start_lng=126.9780) -> list[dict]:
     """카테고리 순서 유지 + 이전 장소에서 가장 가까운 장소 선택"""
@@ -98,21 +121,23 @@ async def course_plan_node(state: AgentState) -> dict:
 
     # 1) 파라미터 추출
     try:
-        resp = await llm_json.ainvoke([
-            SystemMessage(content=PARAM_SYSTEM),
-            HumanMessage(content=f"오늘: {date.today().isoformat()}\n\n{user_message}"),
-        ])
+        resp = await llm_json.ainvoke(
+            [
+                SystemMessage(content=PARAM_SYSTEM),
+                HumanMessage(content=f"오늘: {date.today().isoformat()}\n\n{user_message}"),
+            ]
+        )
         params = json.loads(resp.content)
     except Exception:
         params = {}
 
-    course_date    = params.get("date", "")
-    area           = params.get("area", "서울")
+    course_date = params.get("date", "")
+    area = params.get("area", "서울")
     start_time_str = params.get("start_time", "10:00")
-    categories     = params.get("categories", [])
-    preferences    = params.get("preferences", "")
-    add_cal        = params.get("add_to_calendar", False)
-    num_stops      = min(max(int(params.get("num_stops", 4)), 2), 6)
+    categories = params.get("categories", [])
+    preferences = params.get("preferences", "")
+    add_cal = params.get("add_to_calendar", False)
+    num_stops = min(max(int(params.get("num_stops", 4)), 2), 6)
 
     # 기본 카테고리 보완
     _defaults = ["카페", "전시", "레스토랑", "공원"]
@@ -147,11 +172,13 @@ async def course_plan_node(state: AgentState) -> dict:
     if not route_places:
         return {
             "events": [],
-            "response_blocks": [{
-                "type": "text_stream",
-                "system": None,
-                "prompt": f"'{user_message}' 코스를 구성할 장소를 찾지 못했습니다. 지역이나 카테고리를 다르게 입력해보라고 안내해주세요.",
-            }],
+            "response_blocks": [
+                {
+                    "type": "text_stream",
+                    "system": None,
+                    "prompt": f"'{user_message}' 코스를 구성할 장소를 찾지 못했습니다. 지역이나 카테고리를 다르게 입력해보라고 안내해주세요.",
+                }
+            ],
             "messages": [HumanMessage(content=user_message)],
         }
 
@@ -168,58 +195,67 @@ async def course_plan_node(state: AgentState) -> dict:
         dur = _duration(cat_label)
         t_start = f"{cur_min // 60:02d}:{cur_min % 60:02d}"
         cur_min += dur
-        t_end   = f"{cur_min // 60:02d}:{cur_min % 60:02d}"
+        t_end = f"{cur_min // 60:02d}:{cur_min % 60:02d}"
 
         walk = 0
         if i < len(route_places) - 1:
-            nxt  = route_places[i + 1]
-            km   = _haversine_km(
-                place.get("lat", start_lat), place.get("lng", start_lng),
-                nxt.get("lat",   start_lat), nxt.get("lng",   start_lng),
+            nxt = route_places[i + 1]
+            km = _haversine_km(
+                place.get("lat", start_lat),
+                place.get("lng", start_lng),
+                nxt.get("lat", start_lat),
+                nxt.get("lng", start_lng),
             )
             walk = _walk_min(km)
             cur_min += walk
 
-        stops.append({
-            "order":             i + 1,
-            "time_start":        t_start,
-            "time_end":          t_end,
-            "duration_min":      dur,
-            "walk_to_next_min":  walk,
-            "place":             place,
-            "category_label":    cat_label,
-        })
+        stops.append(
+            {
+                "order": i + 1,
+                "time_start": t_start,
+                "time_end": t_end,
+                "duration_min": dur,
+                "walk_to_next_min": walk,
+                "place": place,
+                "category_label": cat_label,
+            }
+        )
 
     # 5) 응답 블록
     response_blocks: list[dict] = []
 
     # 코스 타임라인 카드
-    response_blocks.append({
-        "type":  "course",
-        "date":  course_date,
-        "area":  area,
-        "stops": stops,
-    })
+    response_blocks.append(
+        {
+            "type": "course",
+            "date": course_date,
+            "area": area,
+            "stops": stops,
+        }
+    )
 
     # 지도 마커
     markers = [
         {
             "place_id": s["place"].get("place_id", f"stop-{s['order']}"),
-            "name":     s["place"].get("name", ""),
-            "lat":      s["place"].get("lat", 0),
-            "lng":      s["place"].get("lng", 0),
+            "name": s["place"].get("name", ""),
+            "lat": s["place"].get("lat", 0),
+            "lng": s["place"].get("lng", 0),
             "category": s["category_label"],
-            "label":    str(s["order"]),
+            "label": str(s["order"]),
         }
-        for s in stops if s["place"].get("lat")
+        for s in stops
+        if s["place"].get("lat")
     ]
     if markers:
-        response_blocks.append({
-            "type":    "map_markers",
-            "center":  {"lat": markers[0]["lat"], "lng": markers[0]["lng"]},
-            "zoom":    14,
-            "markers": markers,
-        })
+        response_blocks.append(
+            {
+                "type": "map_markers",
+                "center": {"lat": markers[0]["lat"], "lng": markers[0]["lng"]},
+                "zoom": 14,
+                "markers": markers,
+            }
+        )
 
     # 6) 캘린더 추가 (날짜 있고 요청한 경우)
     cal_count = 0
@@ -250,23 +286,26 @@ async def course_plan_node(state: AgentState) -> dict:
         for s in stops
     )
     cal_note = (
-        f" 캘린더에 {cal_count}개 일정을 추가했어." if cal_count
+        f" 캘린더에 {cal_count}개 일정을 추가했어."
+        if cal_count
         else (" 캘린더에 추가하려면 날짜도 알려줘." if add_cal and not course_date else "")
     )
 
-    response_blocks.append({
-        "type":   "text_stream",
-        "system": "당신은 서울 로컬 코스 플래너입니다. 아래 코스를 바탕으로 각 장소의 매력과 이동 동선을 자연스럽고 친근하게 소개해주세요. 이모지 사용 가능.",
-        "prompt": (
-            f"사용자 요청: {user_message}\n"
-            f"지역: {area}"
-            + (f" / {course_date}" if course_date else "")
-            + f"\n\n코스:\n{stops_summary}\n\n{cal_note}"
-        ),
-    })
+    response_blocks.append(
+        {
+            "type": "text_stream",
+            "system": "당신은 서울 로컬 코스 플래너입니다. 아래 코스를 바탕으로 각 장소의 매력과 이동 동선을 자연스럽고 친근하게 소개해주세요. 이모지 사용 가능.",
+            "prompt": (
+                f"사용자 요청: {user_message}\n"
+                f"지역: {area}"
+                + (f" / {course_date}" if course_date else "")
+                + f"\n\n코스:\n{stops_summary}\n\n{cal_note}"
+            ),
+        }
+    )
 
     return {
-        "places":          [s["place"] for s in stops],
+        "places": [s["place"] for s in stops],
         "response_blocks": response_blocks,
-        "messages":        [HumanMessage(content=user_message)],
+        "messages": [HumanMessage(content=user_message)],
     }

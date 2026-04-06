@@ -4,15 +4,18 @@ CSV → PostgreSQL(places) + OpenSearch(places_vector) 동시 적재 ETL
 실행:
     python scripts/etl_places.py --file data/소상공인_상권.csv --category restaurant
 """
-import asyncio
+
 import argparse
-import uuid
+import asyncio
 import json
+import uuid
+
 import asyncpg
 import httpx
 import pandas as pd
-from opensearchpy import AsyncOpenSearch, helpers
 from dotenv import load_dotenv
+from opensearchpy import AsyncOpenSearch, helpers
+
 load_dotenv("backend/.env")
 load_dotenv(".env")
 
@@ -23,30 +26,55 @@ import os
 # ============================================================
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://localbiz:localbiz@localhost:5434/localbiz")
 OPENSEARCH_HOST = os.getenv("OPENSEARCH_HOST", "localhost")
+OPENSEARCH_PORT = int(os.getenv("OPENSEARCH_PORT", 9200))
 GEMINI_API_KEY = os.getenv("GEMINI_LLM_API_KEY", "")
 
 CATEGORY_MAP = {
-    "한식": "restaurant", "중식": "restaurant", "일식": "restaurant",
-    "양식": "restaurant", "분식": "restaurant", "카페": "cafe",
-    "제과점": "cafe", "헬스": "gym", "피트니스": "gym",
-    "미용실": "beauty", "네일": "beauty", "공원": "park",
-    "도서관": "library", "약국": "pharmacy",
+    "한식": "restaurant",
+    "중식": "restaurant",
+    "일식": "restaurant",
+    "양식": "restaurant",
+    "분식": "restaurant",
+    "카페": "cafe",
+    "제과점": "cafe",
+    "헬스": "gym",
+    "피트니스": "gym",
+    "미용실": "beauty",
+    "네일": "beauty",
+    "공원": "park",
+    "도서관": "library",
+    "약국": "pharmacy",
 }
 
 DISTRICT_MAP = {
-    "강남구": "gangnam", "강동구": "gangdong", "강북구": "gangbuk",
-    "강서구": "gangseo", "관악구": "gwanak", "광진구": "gwangjin",
-    "구로구": "guro", "금천구": "geumcheon", "노원구": "nowon",
-    "도봉구": "dobong", "동대문구": "dongdaemun", "동작구": "dongjak",
-    "마포구": "mapo", "서대문구": "seodaemun", "서초구": "seocho",
-    "성동구": "seongdong", "성북구": "seongbuk", "송파구": "songpa",
-    "양천구": "yangcheon", "영등포구": "yeongdeungpo", "용산구": "yongsan",
-    "은평구": "eunpyeong", "종로구": "jongno", "중구": "jung",
+    "강남구": "gangnam",
+    "강동구": "gangdong",
+    "강북구": "gangbuk",
+    "강서구": "gangseo",
+    "관악구": "gwanak",
+    "광진구": "gwangjin",
+    "구로구": "guro",
+    "금천구": "geumcheon",
+    "노원구": "nowon",
+    "도봉구": "dobong",
+    "동대문구": "dongdaemun",
+    "동작구": "dongjak",
+    "마포구": "mapo",
+    "서대문구": "seodaemun",
+    "서초구": "seocho",
+    "성동구": "seongdong",
+    "성북구": "seongbuk",
+    "송파구": "songpa",
+    "양천구": "yangcheon",
+    "영등포구": "yeongdeungpo",
+    "용산구": "yongsan",
+    "은평구": "eunpyeong",
+    "종로구": "jongno",
+    "중구": "jung",
     "중랑구": "jungnang",
 }
 
-CORE_COLUMNS = {"place_id", "name", "category", "sub_category", "district",
-                "address", "lat", "lng", "phone", "source"}
+CORE_COLUMNS = {"place_id", "name", "category", "sub_category", "district", "address", "lat", "lng", "phone", "source"}
 
 
 def make_page_content(row: dict) -> str:
@@ -56,16 +84,10 @@ def make_page_content(row: dict) -> str:
     category = row.get("category", "")
     sub = row.get("sub_category", "")
     address = row.get("address", "")
-    return (
-        f"{name}은(는) {district}에 위치한 {category} ({sub})입니다. "
-        f"주소: {address}."
-    )
+    return f"{name}은(는) {district}에 위치한 {category} ({sub})입니다. 주소: {address}."
 
 
-GEMINI_EMBED_URL = (
-    "https://generativelanguage.googleapis.com/v1beta/models/"
-    "gemini-embedding-001:embedContent"
-)
+GEMINI_EMBED_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent"
 
 
 async def embed_batch(texts: list[str]) -> list[list[float]]:
@@ -117,8 +139,8 @@ async def run_etl(csv_path: str, default_category: str, source: str):
 
         # 컬럼명 표준화
         name = raw.get("상호명") or raw.get("사업장명") or raw.get("name", "")
-        lat  = float(raw.get("위도") or raw.get("lat", 0))
-        lng  = float(raw.get("경도") or raw.get("lng", 0))
+        lat = float(raw.get("위도") or raw.get("lat", 0))
+        lng = float(raw.get("경도") or raw.get("lng", 0))
         addr = raw.get("도로명주소") or raw.get("지번주소") or raw.get("address", "")
         dist_raw = raw.get("시군구") or raw.get("자치구") or ""
         dist_code = DISTRICT_MAP.get(dist_raw, "")
@@ -142,12 +164,25 @@ async def run_etl(csv_path: str, default_category: str, source: str):
             "source": source,
         }
         # 나머지 전체를 raw_data JSONB로
-        raw_data = {k: v for k, v in raw.items()
-                    if k not in ("위도", "경도", "상호명", "사업장명", "도로명주소",
-                                 "지번주소", "전화번호", "시군구", "자치구", "시도")}
+        raw_data = {
+            k: v
+            for k, v in raw.items()
+            if k
+            not in (
+                "위도",
+                "경도",
+                "상호명",
+                "사업장명",
+                "도로명주소",
+                "지번주소",
+                "전화번호",
+                "시군구",
+                "자치구",
+                "시도",
+            )
+        }
 
-        records.append({**core, "raw_data": raw_data,
-                         "page_content": make_page_content(core)})
+        records.append({**core, "raw_data": raw_data, "page_content": make_page_content(core)})
 
     print(f"  변환 완료: {len(records)}건")
 
@@ -157,13 +192,19 @@ async def run_etl(csv_path: str, default_category: str, source: str):
     pg_count = 0
     async with pool.acquire() as conn:
         for i in range(0, len(records), BATCH):
-            batch = records[i:i + BATCH]
+            batch = records[i : i + BATCH]
             values = [
                 (
-                    r["place_id"], r["name"], r["category"], r.get("sub_category"),
-                    r.get("district"), r.get("address"),
-                    r.get("lng"), r.get("lat"),  # ST_MakePoint(lng, lat)
-                    r.get("phone"), json.dumps(r["raw_data"], ensure_ascii=False),
+                    r["place_id"],
+                    r["name"],
+                    r["category"],
+                    r.get("sub_category"),
+                    r.get("district"),
+                    r.get("address"),
+                    r.get("lng"),
+                    r.get("lat"),  # ST_MakePoint(lng, lat)
+                    r.get("phone"),
+                    json.dumps(r["raw_data"], ensure_ascii=False),
                     r["source"],
                 )
                 for r in batch
@@ -194,7 +235,8 @@ async def run_etl(csv_path: str, default_category: str, source: str):
 
     os_client = AsyncOpenSearch(
         hosts=[{"host": OPENSEARCH_HOST, "port": OPENSEARCH_PORT}],
-        use_ssl=False, verify_certs=False,
+        use_ssl=False,
+        verify_certs=False,
     )
 
     actions = [
@@ -212,7 +254,7 @@ async def run_etl(csv_path: str, default_category: str, source: str):
                 },
             },
         }
-        for r, emb in zip(records, embeddings)
+        for r, emb in zip(records, embeddings, strict=False)
     ]
 
     ok, errors = await helpers.async_bulk(os_client, actions, chunk_size=500)

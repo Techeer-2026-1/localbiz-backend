@@ -15,13 +15,11 @@ Usage:
 
 from __future__ import annotations
 
-import asyncio
 import argparse
+import asyncio
 import json
-import re
 import logging
-from datetime import datetime, timedelta, timezone
-from typing import Optional, List, Dict, Tuple
+import re
 
 import httpx
 
@@ -31,11 +29,12 @@ logger = logging.getLogger(__name__)
 # ─────────────────────── 설정 ───────────────────────
 
 from dotenv import load_dotenv
+
 load_dotenv("backend/.env")
 load_dotenv(".env")
 
 from backend.src.config import get_settings
-from backend.src.db.postgres import get_pool, fetch_all, fetch_one, execute
+from backend.src.db.postgres import execute, fetch_all, fetch_one, get_pool
 
 settings = get_settings()
 
@@ -74,11 +73,13 @@ async def collect_google_reviews(google_place_id: str) -> list[dict]:
         for r in data.get("reviews", []):
             text = r.get("text", "").strip()
             if text:
-                reviews.append({
-                    "text": text,
-                    "rating": r.get("rating"),
-                    "source": "google",
-                })
+                reviews.append(
+                    {
+                        "text": text,
+                        "rating": r.get("rating"),
+                        "source": "google",
+                    }
+                )
 
         meta = {
             "avg_rating": data.get("rating"),
@@ -114,11 +115,13 @@ async def collect_naver_reviews(place_name: str, display: int = 10) -> list[dict
         for item in items:
             desc = re.sub(r"<[^>]+>", "", item.get("description", "")).strip()
             if desc:
-                reviews.append({
-                    "text": desc,
-                    "source": "naver",
-                    "postdate": item.get("postdate"),
-                })
+                reviews.append(
+                    {
+                        "text": desc,
+                        "source": "naver",
+                        "postdate": item.get("postdate"),
+                    }
+                )
         return reviews
     except Exception as e:
         logger.warning(f"네이버 리뷰 수집 실패: {e}")
@@ -126,6 +129,7 @@ async def collect_naver_reviews(place_name: str, display: int = 10) -> list[dict
 
 
 # ─────────────────────── 2단계: 전처리 ───────────────────────
+
 
 def preprocess_reviews(reviews: list[dict]) -> list[dict]:
     """광고/스팸 필터링 + 중복 제거"""
@@ -198,10 +202,7 @@ async def analyze_with_llm(
         return None
 
     # 리뷰 텍스트 병합
-    reviews_text = "\n".join(
-        f"[{r['source']}] (★{r.get('rating', '?')}) {r['text'][:300]}"
-        for r in reviews
-    )
+    reviews_text = "\n".join(f"[{r['source']}] (★{r.get('rating', '?')}) {r['text'][:300]}" for r in reviews)
 
     prompt = ANALYSIS_PROMPT.format(
         place_name=place_name,
@@ -254,10 +255,7 @@ async def analyze_with_claude(
         logger.error("ANTHROPIC_API_KEY 미설정 — 분석 불가")
         return None
 
-    reviews_text = "\n".join(
-        f"[{r['source']}] (★{r.get('rating', '?')}) {r['text'][:300]}"
-        for r in reviews
-    )
+    reviews_text = "\n".join(f"[{r['source']}] (★{r.get('rating', '?')}) {r['text'][:300]}" for r in reviews)
 
     prompt = ANALYSIS_PROMPT.format(
         place_name=place_name,
@@ -268,6 +266,7 @@ async def analyze_with_claude(
 
     try:
         import anthropic
+
         client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
         message = await client.messages.create(
             model="claude-sonnet-4-20250514",
@@ -288,6 +287,7 @@ async def analyze_with_claude(
 
 
 # ─────────────────────── 4단계: DB 적재 ───────────────────────
+
 
 async def upsert_analysis(
     place_id: str,
@@ -356,6 +356,7 @@ async def upsert_analysis(
 
 # ─────────────────────── 전체 파이프라인 ───────────────────────
 
+
 async def analyze_place(
     place_id: str,
     google_place_id: str,
@@ -373,7 +374,7 @@ async def analyze_place(
     logger.info(f"  수집 완료: Google {len(google_reviews)}건, Naver {len(naver_reviews)}건")
 
     if not all_reviews:
-        logger.warning(f"  리뷰 없음 — 건너뜀")
+        logger.warning("  리뷰 없음 — 건너뜀")
         return None
 
     # 2. 전처리
@@ -381,16 +382,18 @@ async def analyze_place(
     logger.info(f"  전처리 후: {len(cleaned)}건 (필터링: {len(all_reviews) - len(cleaned)}건)")
 
     if not cleaned:
-        logger.warning(f"  유효 리뷰 없음 — 건너뜀")
+        logger.warning("  유효 리뷰 없음 — 건너뜀")
         return None
 
     # 3. LLM 분석
     analysis = await analyze_with_llm(place_name, category, cleaned)
     if not analysis:
-        logger.error(f"  LLM 분석 실패")
+        logger.error("  LLM 분석 실패")
         return None
 
-    logger.info(f"  분석 완료: {json.dumps({k: v for k, v in analysis.items() if k.startswith('score_')}, ensure_ascii=False)}")
+    logger.info(
+        f"  분석 완료: {json.dumps({k: v for k, v in analysis.items() if k.startswith('score_')}, ensure_ascii=False)}"
+    )
 
     # 4. DB 적재
     await upsert_analysis(
@@ -400,7 +403,7 @@ async def analyze_place(
         analysis=analysis,
         reviews=cleaned,
     )
-    logger.info(f"  DB 적재 완료")
+    logger.info("  DB 적재 완료")
 
     return analysis
 
@@ -410,7 +413,8 @@ async def batch_analyze(limit: int = 50) -> None:
     await get_pool()
 
     # 아직 분석되지 않았거나 만료된 장소 우선
-    rows = await fetch_all("""
+    rows = await fetch_all(
+        """
         SELECT p.place_id, p.google_place_id, p.name, p.category
         FROM places p
         LEFT JOIN place_analysis pa ON p.place_id = pa.place_id
@@ -418,12 +422,14 @@ async def batch_analyze(limit: int = 50) -> None:
           AND (pa.place_id IS NULL OR pa.ttl_expires_at < NOW())
         ORDER BY p.created_at DESC
         LIMIT $1
-    """, limit)
+    """,
+        limit,
+    )
 
     logger.info(f"배치 분석 대상: {len(rows)}건")
 
     for i, row in enumerate(rows):
-        logger.info(f"[{i+1}/{len(rows)}] {row['name']}")
+        logger.info(f"[{i + 1}/{len(rows)}] {row['name']}")
         try:
             await analyze_place(
                 place_id=str(row["place_id"]),
@@ -439,6 +445,7 @@ async def batch_analyze(limit: int = 50) -> None:
 
 
 # ─────────────────────── CLI ───────────────────────
+
 
 async def main():
     parser = argparse.ArgumentParser(description="리뷰 분석 배치 스크립트")

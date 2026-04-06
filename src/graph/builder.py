@@ -1,15 +1,17 @@
 """LangGraph 그래프 빌더 — 노드 등록, 조건 분기, Checkpointer 설정"""
-from langgraph.graph import StateGraph, END
-from langgraph.checkpoint.memory import MemorySaver
+
 import logging
 
-from backend.src.graph.state import AgentState
-from backend.src.graph.intent_router import intent_router, route_by_intent
-from backend.src.graph.conversation import conversation_agent
-from backend.src.graph.search_agent import search_agent
-from backend.src.graph.action_agent import action_agent
-from backend.src.graph.response_composer import response_composer
+from langgraph.checkpoint.memory import MemorySaver
+from langgraph.graph import END, StateGraph
+
 from backend.src.config import get_settings
+from backend.src.graph.action_agent import action_agent
+from backend.src.graph.conversation import conversation_agent
+from backend.src.graph.intent_router import intent_router, route_by_intent
+from backend.src.graph.response_composer import response_composer
+from backend.src.graph.search_agent import search_agent
+from backend.src.graph.state import AgentState
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -53,7 +55,7 @@ async def build_graph():
 
     # 각 에이전트 → Response Composer
     workflow.add_edge("conversation", "response_composer")
-    
+
     # search_agent에서 intent가 COURSE_PLAN이면 action_agent로
     def route_after_search(state: AgentState) -> str:
         if state.get("intent") == "COURSE_PLAN":

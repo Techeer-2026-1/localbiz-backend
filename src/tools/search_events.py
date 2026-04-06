@@ -1,6 +1,9 @@
 """행사/축제 검색 도구 — events 테이블 날짜 필터 + 자연어 날짜 파싱"""
+
 from datetime import date
+
 from langchain_core.tools import tool
+
 from backend.src.db.postgres import fetch_all
 from backend.src.utils.date_parser import parse_date_range
 
@@ -58,7 +61,7 @@ async def search_events(
                date_start::text, date_end::text,
                price, poster_url, detail_url, source, kopis_sales_rate
         FROM events
-        WHERE {' AND '.join(conditions)}
+        WHERE {" AND ".join(conditions)}
         ORDER BY {order_clause}
         LIMIT {limit}
     """

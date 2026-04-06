@@ -1,5 +1,7 @@
 """서울 열린데이터광장 — 문화행사 API 클라이언트"""
+
 import httpx
+
 from backend.src.config import get_settings
 
 settings = get_settings()
@@ -8,18 +10,40 @@ BASE_URL = "http://openapi.seoul.go.kr:8088"
 
 # 동네명 → 자치구 매핑
 NEIGHBORHOOD_TO_DISTRICT = {
-    "홍대": "마포구", "합정": "마포구", "망원": "마포구", "상수": "마포구",
-    "강남": "강남구", "압구정": "강남구", "청담": "강남구", "역삼": "강남구", "삼성": "강남구",
-    "이태원": "용산구", "한남": "용산구", "용산": "용산구",
-    "신촌": "서대문구", "연남": "마포구", "연희": "서대문구",
-    "종로": "종로구", "인사동": "종로구", "광화문": "종로구", "북촌": "종로구",
-    "성수": "성동구", "왕십리": "성동구",
-    "건대": "광진구", "뚝섬": "광진구",
-    "잠실": "송파구", "석촌": "송파구",
-    "신림": "관악구", "서울대": "관악구",
-    "노원": "노원구", "도봉": "도봉구",
-    "마포": "마포구", "서대문": "서대문구", "동대문": "동대문구",
-    "중구": "중구", "중랑": "중랑구",
+    "홍대": "마포구",
+    "합정": "마포구",
+    "망원": "마포구",
+    "상수": "마포구",
+    "강남": "강남구",
+    "압구정": "강남구",
+    "청담": "강남구",
+    "역삼": "강남구",
+    "삼성": "강남구",
+    "이태원": "용산구",
+    "한남": "용산구",
+    "용산": "용산구",
+    "신촌": "서대문구",
+    "연남": "마포구",
+    "연희": "서대문구",
+    "종로": "종로구",
+    "인사동": "종로구",
+    "광화문": "종로구",
+    "북촌": "종로구",
+    "성수": "성동구",
+    "왕십리": "성동구",
+    "건대": "광진구",
+    "뚝섬": "광진구",
+    "잠실": "송파구",
+    "석촌": "송파구",
+    "신림": "관악구",
+    "서울대": "관악구",
+    "노원": "노원구",
+    "도봉": "도봉구",
+    "마포": "마포구",
+    "서대문": "서대문구",
+    "동대문": "동대문구",
+    "중구": "중구",
+    "중랑": "중랑구",
 }
 
 
@@ -78,7 +102,7 @@ async def search_events(
     results = []
     for r in rows:
         event_start = (r.get("STRTDATE") or "")[:10]
-        event_end   = (r.get("END_DATE")  or "9999-12-31")[:10]
+        event_end = (r.get("END_DATE") or "9999-12-31")[:10]
 
         # 날짜 필터 — 기간 겹침 체크
         if date_start and event_end < date_start:
@@ -111,33 +135,35 @@ async def search_events(
         # 키워드 필터 (제목 + 장소 + 출연진)
         if keyword:
             searchable = (
-                r.get("TITLE", "") +
-                r.get("PLACE", "") +
-                r.get("PLAYER", "") +
-                r.get("CODENAME", "") +
-                r.get("THEMECODE", "")
+                r.get("TITLE", "")
+                + r.get("PLACE", "")
+                + r.get("PLAYER", "")
+                + r.get("CODENAME", "")
+                + r.get("THEMECODE", "")
             )
             if keyword not in searchable:
                 continue
 
-        results.append({
-            "event_id": r.get("TITLE", "") + "_" + event_start,
-            "title": r.get("TITLE", ""),
-            "category": r.get("CODENAME", ""),
-            "place_name": r.get("PLACE", ""),
-            "address": r.get("GUNAME", "") + (" " + r.get("PLACE", "") if r.get("PLACE") else ""),
-            "date_start": event_start,
-            "date_end": event_end,
-            "price": r.get("USE_FEE", ""),
-            "target": r.get("USE_TRGT", ""),
-            "player": r.get("PLAYER", ""),
-            "pro_time": r.get("PRO_TIME", ""),
-            "poster_url": r.get("MAIN_IMG", ""),
-            "detail_url": r.get("HMPG_ADDR", "") or r.get("ORG_LINK", ""),
-            "is_free": r.get("IS_FREE", "") == "무료",
-            "lat": float(r["LAT"]) if r.get("LAT") else None,
-            "lng": float(r["LOT"]) if r.get("LOT") else None,
-        })
+        results.append(
+            {
+                "event_id": r.get("TITLE", "") + "_" + event_start,
+                "title": r.get("TITLE", ""),
+                "category": r.get("CODENAME", ""),
+                "place_name": r.get("PLACE", ""),
+                "address": r.get("GUNAME", "") + (" " + r.get("PLACE", "") if r.get("PLACE") else ""),
+                "date_start": event_start,
+                "date_end": event_end,
+                "price": r.get("USE_FEE", ""),
+                "target": r.get("USE_TRGT", ""),
+                "player": r.get("PLAYER", ""),
+                "pro_time": r.get("PRO_TIME", ""),
+                "poster_url": r.get("MAIN_IMG", ""),
+                "detail_url": r.get("HMPG_ADDR", "") or r.get("ORG_LINK", ""),
+                "is_free": r.get("IS_FREE", "") == "무료",
+                "lat": float(r["LAT"]) if r.get("LAT") else None,
+                "lng": float(r["LOT"]) if r.get("LOT") else None,
+            }
+        )
 
         if len(results) >= limit:
             break

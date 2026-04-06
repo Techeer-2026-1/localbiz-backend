@@ -9,21 +9,21 @@ Usage:
     python scripts/load_events_vector.py
 """
 
-from typing import Optional
-import asyncio
 import argparse
+import asyncio
 import logging
 import time
 
 from dotenv import load_dotenv
+
 load_dotenv("backend/.env")
 load_dotenv(".env")
 
-from backend.src.config import get_settings
-from backend.src.db.postgres import get_pool, fetch_all
 from embed_utils import embed_texts
-
 from opensearchpy import OpenSearch, helpers
+
+from backend.src.config import get_settings
+from backend.src.db.postgres import fetch_all, get_pool
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -69,7 +69,7 @@ async def load_events(dry_run: bool = False, batch_size: int = 500):
 
     if dry_run:
         for i in range(min(5, len(rows))):
-            logger.info(f"  [{i+1}] {rows[i]['title']}: {descriptions[i][:120]}...")
+            logger.info(f"  [{i + 1}] {rows[i]['title']}: {descriptions[i][:120]}...")
         logger.info(f"--dry-run: {len(rows)}건 중 샘플 출력 완료")
         return
 
@@ -78,28 +78,30 @@ async def load_events(dry_run: bool = False, batch_size: int = 500):
     total_errors = 0
 
     for i in range(0, len(rows), batch_size):
-        batch_rows = rows[i:i + batch_size]
-        batch_descs = descriptions[i:i + batch_size]
+        batch_rows = rows[i : i + batch_size]
+        batch_descs = descriptions[i : i + batch_size]
 
         embeddings = embed_texts(batch_descs)
 
         actions = []
         for j, row in enumerate(batch_rows):
-            actions.append({
-                "_index": settings.events_index,
-                "_id": str(row["event_id"]),
-                "_source": {
-                    "event_id": str(row["event_id"]),
-                    "title": row["title"],
-                    "description": batch_descs[j],
-                    "embedding": embeddings[j],
-                    "category": row.get("category", ""),
-                    "district": row.get("district", ""),
-                    "date_start": row["date_start"].isoformat() if row.get("date_start") else None,
-                    "date_end": row["date_end"].isoformat() if row.get("date_end") else None,
-                    "source": row.get("source", ""),
-                },
-            })
+            actions.append(
+                {
+                    "_index": settings.events_index,
+                    "_id": str(row["event_id"]),
+                    "_source": {
+                        "event_id": str(row["event_id"]),
+                        "title": row["title"],
+                        "description": batch_descs[j],
+                        "embedding": embeddings[j],
+                        "category": row.get("category", ""),
+                        "district": row.get("district", ""),
+                        "date_start": row["date_start"].isoformat() if row.get("date_start") else None,
+                        "date_end": row["date_end"].isoformat() if row.get("date_end") else None,
+                        "source": row.get("source", ""),
+                    },
+                }
+            )
 
         success, errors = helpers.bulk(os_client, actions)
         total_indexed += success
