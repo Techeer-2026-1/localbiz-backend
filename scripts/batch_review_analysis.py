@@ -359,15 +359,17 @@ async def upsert_analysis(
 
 async def analyze_place(
     place_id: str,
-    google_place_id: str,
+    google_place_id: str | None,
     place_name: str,
     category: str | None = None,
 ) -> dict | None:
-    """단일 장소 전체 분석 파이프라인"""
-    logger.info(f"분석 시작: {place_name} ({google_place_id})")
+    """단일 장소 전체 분석 파이프라인. google_place_id 없으면 Naver Blog만 사용."""
+    logger.info(f"분석 시작: {place_name} (gid={google_place_id or 'NAVER_ONLY'})")
 
     # 1. 수집
-    google_reviews, google_meta = await collect_google_reviews(google_place_id)
+    google_reviews, google_meta = [], {}
+    if google_place_id:
+        google_reviews, google_meta = await collect_google_reviews(google_place_id)
     naver_reviews = await collect_naver_reviews(place_name)
 
     all_reviews = google_reviews + naver_reviews
@@ -408,25 +410,46 @@ async def analyze_place(
     return analysis
 
 
-async def batch_analyze(limit: int = 50) -> None:
-    """places 테이블에서 google_place_id가 있는 장소를 배치 분석"""
+async def batch_analyze(limit: int = 50, category: str | None = None, naver_only: bool = False) -> None:
+    """places 테이블에서 장소를 배치 분석. naver_only=True면 google_place_id 없어도 진행."""
     await get_pool()
 
-    # 아직 분석되지 않았거나 만료된 장소 우선
-    rows = await fetch_all(
+    if naver_only:
+        # Naver Blog만으로 분석 (google_place_id 불필요)
+        query = """
+            SELECT p.place_id, p.google_place_id, p.name, p.category
+            FROM places p
+            LEFT JOIN place_analysis pa ON p.place_id = pa.place_id
+            WHERE pa.place_id IS NULL OR pa.ttl_expires_at < NOW()
         """
-        SELECT p.place_id, p.google_place_id, p.name, p.category
-        FROM places p
-        LEFT JOIN place_analysis pa ON p.place_id = pa.place_id
-        WHERE p.google_place_id IS NOT NULL
-          AND (pa.place_id IS NULL OR pa.ttl_expires_at < NOW())
-        ORDER BY p.created_at DESC
-        LIMIT $1
-    """,
-        limit,
-    )
+        params = []
+        if category:
+            params.append(category)
+            query += f" AND p.category = ${len(params)}"
+        query += " ORDER BY p.created_at DESC"
+        params.append(limit)
+        query += f" LIMIT ${len(params)}"
+        rows = await fetch_all(query, *params)
+    else:
+        # google_place_id 있는 장소만 (Google Reviews + Naver Blog)
+        query = """
+            SELECT p.place_id, p.google_place_id, p.name, p.category
+            FROM places p
+            LEFT JOIN place_analysis pa ON p.place_id = pa.place_id
+            WHERE p.google_place_id IS NOT NULL
+              AND (pa.place_id IS NULL OR pa.ttl_expires_at < NOW())
+        """
+        params = []
+        if category:
+            params.append(category)
+            query += f" AND p.category = ${len(params)}"
+        query += " ORDER BY p.created_at DESC"
+        params.append(limit)
+        query += f" LIMIT ${len(params)}"
+        rows = await fetch_all(query, *params)
 
-    logger.info(f"배치 분석 대상: {len(rows)}건")
+    mode = "NAVER_ONLY" if naver_only else "GOOGLE+NAVER"
+    logger.info(f"배치 분석 대상: {len(rows)}건 (mode={mode}" + (f", category={category}" if category else "") + ")")
 
     for i, row in enumerate(rows):
         logger.info(f"[{i + 1}/{len(rows)}] {row['name']}")
@@ -440,8 +463,7 @@ async def batch_analyze(limit: int = 50) -> None:
         except Exception as e:
             logger.error(f"  오류: {e}")
 
-        # Rate limit 보호 (Google Places API: 초당 10건)
-        await asyncio.sleep(1.0)
+        await asyncio.sleep(0.5 if naver_only else 1.0)
 
 
 # ─────────────────────── CLI ───────────────────────
@@ -453,6 +475,7 @@ async def main():
     parser.add_argument("--name", help="장소명 (--place-id와 함께 사용)")
     parser.add_argument("--category", help="카테고리 (restaurant, cafe 등)")
     parser.add_argument("--batch", action="store_true", help="places 테이블 배치 분석")
+    parser.add_argument("--naver-only", action="store_true", help="Naver Blog만으로 분석 (google_place_id 불필요)")
     parser.add_argument("--limit", type=int, default=50, help="배치 분석 최대 건수")
 
     args = parser.parse_args()
@@ -472,7 +495,7 @@ async def main():
         if result:
             print(json.dumps(result, ensure_ascii=False, indent=2))
     elif args.batch:
-        await batch_analyze(limit=args.limit)
+        await batch_analyze(limit=args.limit, category=args.category, naver_only=args.naver_only)
     else:
         parser.print_help()
 

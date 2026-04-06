@@ -101,8 +101,7 @@ INDICES = {
 async def init_indices():
     client = AsyncOpenSearch(
         hosts=[{"host": OPENSEARCH_HOST, "port": OPENSEARCH_PORT}],
-        http_auth=("admin", OPENSEARCH_PASSWORD),
-        use_ssl=OPENSEARCH_HOST != "localhost",
+        use_ssl=False,
         verify_certs=False,
     )
 
