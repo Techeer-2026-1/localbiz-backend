@@ -27,9 +27,6 @@ class Settings(BaseSettings):
             return self.database_url
         return f"postgresql://{self.db_user}:{self.db_password}@{self.db_host}:{self.db_port}/{self.db_name}"
 
-    # Redis
-    redis_url: str = "redis://localhost:6379"
-
     # OpenSearch
     opensearch_host: str = "localhost"
     opensearch_port: int = 9200
@@ -56,10 +53,6 @@ class Settings(BaseSettings):
     slack_webhook_url: str = ""
     jaeger_host: str = "localhost"
     jaeger_port: int = 6831
-
-    # Cache TTL (seconds)
-    google_places_ttl: int = 86400  # 24h
-    naver_blog_ttl: int = 21600  # 6h
 
     # OpenSearch index names
     places_index: str = "places_vector"
