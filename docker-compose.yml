@@ -45,20 +45,6 @@ services:
       timeout: 10s
       retries: 10
 
-  redis:
-    image: redis:7.4-alpine
-    container_name: localbiz-redis
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-
 volumes:
   postgres_data:
   opensearch_data:
-  redis_data:

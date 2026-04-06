@@ -34,13 +34,12 @@ cp .env.example .env
 docker-compose up -d
 ```
 
-3개 서비스가 올라갑니다:
+2개 서비스가 올라갑니다 (프로덕션 DB는 Cloud SQL 사용):
 
 | 서비스 | 포트 | 설명 |
 |--------|------|------|
-| PostgreSQL + PostGIS | 5434 | 정형 데이터 |
+| PostgreSQL + PostGIS | 5434 | 로컬 개발용 (프로덕션은 Cloud SQL) |
 | OpenSearch 2.17 | 9200 | 벡터 검색 (nori 한국어 분석기) |
-| Redis 7.4 | 6379 | API 응답 캐시 |
 
 > 최초 실행 시 `init_db.sql`이 자동 적용됩니다.
 

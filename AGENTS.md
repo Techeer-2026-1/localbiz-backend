@@ -48,5 +48,5 @@ AI 에이전트(Claude Code, Cursor, Copilot)가 이 레포에서 작업할 때 
 
 - 배포: GCP (Google Compute Engine + Cloud SQL + OpenSearch on GCE)
 - CI/CD: GitHub Actions → `.github/workflows/ci.yml` (린트+테스트), `deploy.yml` (GCE 배포)
-- 로컬: `docker-compose up -d` (PostgreSQL 5434, OpenSearch 9200, Redis 6379)
+- 로컬: `docker-compose up -d` (PostgreSQL 5434, OpenSearch 9200)
 - 모니터링: Grafana + Prometheus + Loki + Jaeger (GCE) → Slack
